@@ -1,4 +1,4 @@
-use std::num::ParseIntError;
+use std::{fmt::Write, num::ParseIntError};
 
 use crate::{bit_board::*, piece::*};
 use bitflags::bitflags;
@@ -16,13 +16,13 @@ bitflags! {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct Board {
-    bit_boards: BitBoards,
+    pub bit_boards: BitBoards,
 
-    current_color: PieceColor,
-    castle_flags: CastleFlags,
-    en_pessant_sqaure: u32,
+    pub current_color: PieceColor,
+    pub castle_flags: CastleFlags,
+    pub en_pessant_sqaure: u32,
 }
 
 #[derive(Debug)]
@@ -46,9 +46,23 @@ impl From<ParseIntError> for FenError {
         FenError::ParseIntError(e)
     }
 }
+
+impl fmt::Display for Board {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for (index, piece) in self.bit_boards.to_mailbox().into_iter().enumerate() {
+            if index % 8 == 0 && index != 0 {
+                f.write_char('\n')?;
+            }
+            f.write_fmt(format_args!("{}|", char::from(piece)))?;
+        }
+
+        Ok(())
+    }
+}
+
 impl Board {
     pub fn from_fen(fen: &str) -> Result<Board, FenError> {
-        let mut board = Board::default();
+        let mut bit_boards = BitBoards::default();
 
         let mut words = fen.split_whitespace();
 
@@ -65,7 +79,7 @@ impl Board {
                 _ => {
                     let piece = Piece::try_from(c)?;
 
-                    board.bit_boards[piece.piece_color][piece.piece_type].set_bit(rank * 8 + file);
+                    bit_boards[piece].set_bit(rank * 8 + file);
                     file += 1;
                 }
             }
@@ -74,14 +88,15 @@ impl Board {
             }
         }
 
-        board.current_color = match words.next().ok_or(FenError::NotEnoughInfo())? {
+        let current_color = match words.next().ok_or(FenError::NotEnoughInfo())? {
             "w" | "W" => PieceColor::White,
             "b" | "B" => PieceColor::Black,
             s => return Err(FenError::NoSuchColor(s.to_string())),
         };
 
+        let mut castle_flags = CastleFlags::empty();
         for c in words.next().ok_or(FenError::NotEnoughInfo())?.chars() {
-            board.castle_flags |= match c {
+            castle_flags |= match c {
                 'K' => CastleFlags::WHITE_KING_SIDE_CASTELING,
                 'k' => CastleFlags::BLACK_KING_SIDE_CASTELING,
                 'Q' => CastleFlags::WHITE_QUEEN_SIDE_CASTELING,
@@ -90,17 +105,24 @@ impl Board {
             }
         }
 
-        {
+        let en_pessant_sqaure = {
             let word = words.next().ok_or(FenError::NotEnoughInfo())?;
 
             if word != "-" {
-                board.en_pessant_sqaure = match word.parse()? {
+                match word.parse()? {
                     n @ 0..=48 => n,
                     n => return Err(FenError::EnPessentNotInRange(n)),
                 }
+            } else {
+                0
             }
-        }
+        };
 
-        Ok(board)
+        Ok(Self {
+            bit_boards,
+            current_color,
+            castle_flags,
+            en_pessant_sqaure,
+        })
     }
 }
