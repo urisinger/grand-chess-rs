@@ -1,7 +1,11 @@
+mod bit_board;
+mod piece;
+
 use std::{fmt::Write, num::ParseIntError};
 
-use crate::{bit_board::*, piece::*};
+use bit_board::*;
 use bitflags::bitflags;
+use piece::*;
 
 use std::fmt;
 

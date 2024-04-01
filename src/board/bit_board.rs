@@ -1,7 +1,10 @@
-use crate::piece::*;
 use std::ops::Index;
 use std::ops::IndexMut;
 use std::ops::Shl;
+
+use super::piece::Piece;
+use super::piece::PieceColor;
+use super::piece::PieceIter;
 
 pub struct BitsIterator {
     bits: u64,

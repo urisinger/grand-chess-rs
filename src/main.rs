@@ -1,6 +1,4 @@
-mod bit_board;
 mod board;
-mod piece;
 
 use board::Board;
 
