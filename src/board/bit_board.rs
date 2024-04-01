@@ -1,68 +1,10 @@
+use crate::common::BitsIterator;
 use std::ops::Index;
 use std::ops::IndexMut;
-use std::ops::Shl;
 
 use super::piece::Piece;
 use super::piece::PieceColor;
 use super::piece::PieceIter;
-
-pub struct BitsIterator {
-    bits: u64,
-}
-
-impl BitsIterator {
-    pub fn new(bits: u64) -> Self {
-        Self { bits }
-    }
-}
-
-impl Iterator for BitsIterator {
-    type Item = usize;
-
-    #[inline(always)]
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.bits == 0 {
-            None
-        } else {
-            let index = self.bits.trailing_zeros() as usize;
-            self.bits &= !(1 << index);
-            Some(index)
-        }
-    }
-
-    #[inline(always)]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let size = self.bits.count_ones() as usize;
-
-        (size, Some(size))
-    }
-}
-
-pub trait BitManipulation<T> {
-    fn set_bit(&mut self, index: T);
-    fn clear_bit(&mut self, index: T);
-    fn flip_bit(&mut self, index: T);
-}
-
-impl<T> BitManipulation<T> for u64
-where
-    u64: Shl<T, Output = u64>,
-{
-    #[inline(always)]
-    fn set_bit(&mut self, index: T) {
-        *self |= 1u64 << index;
-    }
-
-    #[inline(always)]
-    fn clear_bit(&mut self, index: T) {
-        *self &= !(1u64 << index);
-    }
-
-    #[inline(always)]
-    fn flip_bit(&mut self, index: T) {
-        *self ^= 1u64 << index;
-    }
-}
 
 #[derive(Default, Debug)]
 pub struct BitBoards {

@@ -64,6 +64,12 @@ impl fmt::Display for Board {
     }
 }
 
+impl Default for Board {
+    fn default() -> Self {
+        Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").unwrap()
+    }
+}
+
 impl Board {
     pub fn from_fen(fen: &str) -> Result<Board, FenError> {
         let mut bit_boards = BitBoards::default();
@@ -83,7 +89,7 @@ impl Board {
                 _ => {
                     let piece = Piece::try_from(c)?;
 
-                    bit_boards[piece].set_bit(rank * 8 + file);
+                    bit_boards[piece] |= 1u64 << (rank * 8 + file);
                     file += 1;
                 }
             }
