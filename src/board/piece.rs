@@ -1,4 +1,5 @@
-use std::ops::Not;
+use core::fmt;
+use std::{fmt::Write, ops::Not, str::FromStr};
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 #[repr(u8)]
@@ -46,6 +47,36 @@ pub enum PieceType {
     Empty = 6,
 }
 
+impl ToString for PieceType{
+    fn to_string(&self) -> String {
+       match *self {
+        PieceType::Pawn => 'p',
+        PieceType::Knight => 'n',
+        PieceType::Bishop => 'b',
+        PieceType::Rook => 'r',
+        PieceType::Queen => 'q',
+        PieceType::King => 'k',
+        PieceType::Empty => ' ',        
+        }.to_string()
+    }
+}
+
+impl FromStr for PieceType{
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s.as_bytes().get(0).ok_or(())? {
+            b'p' => PieceType::Pawn,
+        b'n' => PieceType::Knight ,
+        b'b' => PieceType::Bishop,
+        b'r' => PieceType::Rook ,
+        b'q' => PieceType::Queen,
+        b'k' => PieceType::King,
+        b' ' => PieceType::Empty ,      
+        _ =>   return Err(())
+        })
+    }
+}
+
 impl Default for PieceType {
     fn default() -> Self {
         PieceType::Empty
@@ -74,6 +105,26 @@ pub enum Piece {
     BlackQueen = 10,
     BlackKing = 11,
     Empty = 12,
+}
+
+impl ToString for Piece {
+    fn to_string(&self) -> String {
+        match *self {
+            Piece::WhitePawn => 'p',
+            Piece::WhiteKnight => 'n',
+            Piece::WhiteBishop => 'b',
+            Piece::WhiteRook => 'r',
+            Piece::WhiteQueen => 'q',
+            Piece::WhiteKing => 'k',
+            Piece::BlackPawn => 'P',
+            Piece::BlackKnight => 'N',
+            Piece::BlackBishop => 'B',
+            Piece::BlackRook => 'R',
+            Piece::BlackQueen => 'Q',
+            Piece::BlackKing => 'K',
+            Piece::Empty => ' ',        
+        }.to_string()
+    }
 }
 
 impl Default for Piece {

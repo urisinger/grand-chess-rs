@@ -1,11 +1,11 @@
-use std::fmt;
+use std::{fmt, str::{FromStr}};
 
-use super::{CastleFlags, Piece, PieceType};
+use super::{Piece, PieceType};
 
 #[derive(Default, Clone, Copy)]
 pub struct Move(u32);
 
-impl fmt::Debug for Move {
+impl fmt::Display for Move {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let from_file: char = (b'a' + (self.from() % 8) as u8).into();
         let to_file: char = (b'a' + (self.to() % 8) as u8).into();
@@ -17,19 +17,24 @@ impl fmt::Debug for Move {
             self.to() / 8 + 1
         ))?;
 
+        if self.move_type() == MoveType::Promote{
+            f.write_str(&self.piece().to_string().to_uppercase())?;
+        }
+
         Ok(())
     }
 }
 
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MoveType {
-    QUIET_MOVE = 0,
-    DOUBLE_PUSH = 1,
-    KING_CASTLE = 2,
-    QUEEN_CASTLE = 3,
-    CAPTURE = 4,
-    EN_PASSANT_CAPTURE = 5,
-    PROMOTE = 7,
+    QuietMove = 0,
+    DoublePush = 1,
+    KingCastle = 2,
+    QueenCastle = 3,
+    Capture = 4,
+    EnPassantCapture = 5,
+    Promote = 6,
 }
 
 impl From<u8> for MoveType {
@@ -62,7 +67,7 @@ impl Move {
 
     #[inline]
     pub fn move_type(self) -> MoveType {
-        ((self.0 >> 12) as u8).into()
+        (((self.0 >> 12) & 0b1111) as u8).into()
     }
 
     #[inline]
@@ -108,13 +113,13 @@ impl Move {
 
 #[cfg(test)]
 mod tests {
-    use crate::board::{r#move::Move, CastleFlags, Piece, PieceType};
+    use crate::board::{r#move::Move, Piece, PieceType};
 
     use super::MoveType;
 
     #[test]
     fn test_moves() {
-        test_move(0, 63, MoveType::PROMOTE, Piece::BlackKing, PieceType::Empty);
+        test_move(0, 63, MoveType::Promote, Piece::BlackKing, PieceType::Empty);
     }
 
     fn test_move(from: u32, to: u32, move_type: MoveType, piece: Piece, captured: PieceType) {

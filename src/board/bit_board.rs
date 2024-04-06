@@ -1,11 +1,13 @@
 use std::ops::Index;
 use std::ops::IndexMut;
 
+use crate::util::print_bitboard;
+
 use super::piece::Piece;
 use super::piece::PieceColor;
 use super::piece::PieceIter;
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct BitBoards {
     pub pieces: [u64; 12],
     pub occupancy: [u64; 2],
@@ -55,18 +57,18 @@ impl BitBoards {
     pub fn set_piece(&mut self, square: usize, piece: Piece) {
         if let Some(color) = piece.get_color() {
             self.occupancy[color as usize] |= 1 << square;
-            self.occupancy[!color as usize] &= !(1 << square);
-            for piece in PieceIter::new() {
-                self[piece] &= !(1 << square);
-            }
 
             self[piece] |= 1 << square;
         } else {
-            self.occupancy[PieceColor::White as usize] &= !(1 << square);
-            self.occupancy[PieceColor::Black as usize] &= !(1 << square);
-            for piece in PieceIter::new() {
-                self[piece] &= !(1 << square);
-            }
+            panic!("set_piece cant be used on an empty piece");
+        }
+    }
+
+    pub fn clear_piece(&mut self, square: usize) {
+        self.occupancy[0] &= !(1u64 << square);
+        self.occupancy[1] &= !(1u64 << square);
+        for piece in PieceIter::new() {
+            self[piece] &= !(1 << square);
         }
     }
 
