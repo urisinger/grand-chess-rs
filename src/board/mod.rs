@@ -1,5 +1,7 @@
-mod bit_board;
-mod piece;
+pub mod bit_board;
+pub mod r#move;
+pub mod movegen;
+pub mod piece;
 
 use std::{fmt::Write, num::ParseIntError};
 
@@ -26,7 +28,7 @@ pub struct Board {
 
     pub current_color: PieceColor,
     pub castle_flags: CastleFlags,
-    pub en_pessant_sqaure: u32,
+    pub last_double: Option<u32>,
 }
 
 #[derive(Debug)]
@@ -71,6 +73,10 @@ impl Default for Board {
 }
 
 impl Board {
+    pub fn is_occupied(&self, square: usize) -> bool {
+        self.bit_boards.occupancy() & (1u64 << square) != 0
+    }
+
     pub fn from_fen(fen: &str) -> Result<Board, FenError> {
         let mut bit_boards = BitBoards::default();
 
@@ -89,7 +95,7 @@ impl Board {
                 _ => {
                     let piece = Piece::try_from(c)?;
 
-                    bit_boards[piece] |= 1u64 << (rank * 8 + file);
+                    bit_boards.set_piece((rank * 8 + file) as usize, piece);
                     file += 1;
                 }
             }
@@ -115,24 +121,19 @@ impl Board {
             }
         }
 
-        let en_pessant_sqaure = {
+        let last_double = {
             let word = words.next().ok_or(FenError::NotEnoughInfo())?;
 
             if word != "-" {
                 match word.parse()? {
-                    n @ 0..=48 => n,
+                    n @ 0..=48 => Some(n),
                     n => return Err(FenError::EnPessentNotInRange(n)),
                 }
             } else {
-                0
+                None
             }
         };
 
-        Ok(Self {
-            bit_boards,
-            current_color,
-            castle_flags,
-            en_pessant_sqaure,
-        })
+        Ok(Self { bit_boards, current_color, castle_flags, last_double })
     }
 }

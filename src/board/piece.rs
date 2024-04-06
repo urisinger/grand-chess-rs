@@ -1,8 +1,20 @@
+use std::ops::Not;
+
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 #[repr(u8)]
 pub enum PieceColor {
     White = 0,
     Black = 1,
+}
+
+impl Not for PieceColor {
+    type Output = Self;
+    fn not(self) -> Self::Output {
+        match self {
+            Self::White => Self::Black,
+            Self::Black => Self::White,
+        }
+    }
 }
 
 impl Default for PieceColor {
@@ -40,14 +52,9 @@ impl Default for PieceType {
     }
 }
 
-impl TryFrom<u8> for PieceType {
-    type Error = ();
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        if value > Self::Empty as u8 {
-            Err(())
-        } else {
-            unsafe { Ok(core::mem::transmute(value)) }
-        }
+impl From<u8> for PieceType {
+    fn from(value: u8) -> Self {
+        unsafe { core::mem::transmute(value.clamp(0, 6)) }
     }
 }
 
@@ -80,9 +87,7 @@ impl Piece {
         if piece_type == PieceType::Empty {
             return Self::Empty;
         }
-        (piece_color as u8 * 6 + piece_type as u8)
-            .try_into()
-            .unwrap()
+        (piece_color as u8 * 6 + piece_type as u8).try_into().unwrap()
     }
 
     pub fn get_color(&self) -> Option<PieceColor> {
@@ -93,21 +98,16 @@ impl Piece {
         }
     }
 
-    pub fn get_type(&self) -> Option<PieceType> {
+    pub fn get_type(&self) -> PieceType {
         let type_u8 = (*self as u8) / 2;
 
-        type_u8.try_into().ok()
+        type_u8.into()
     }
 }
 
-impl TryFrom<u8> for Piece {
-    type Error = ();
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        if value > Self::Empty as u8 {
-            Err(())
-        } else {
-            unsafe { Ok(core::mem::transmute(value)) }
-        }
+impl From<u8> for Piece {
+    fn from(value: u8) -> Self {
+        unsafe { core::mem::transmute(value.clamp(0, 12)) }
     }
 }
 
@@ -130,9 +130,9 @@ impl Iterator for PieceIter {
         if self.cur == Piece::Empty as u8 {
             return None;
         }
-        let piece = Piece::try_from(self.cur).ok();
+        let piece = Piece::from(self.cur);
         self.cur += 1;
-        piece
+        Some(piece)
     }
 
     #[inline(always)]
