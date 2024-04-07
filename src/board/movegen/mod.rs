@@ -137,6 +137,7 @@ pub fn generate_moves(board: &Board) -> Moves {
     }
 
     generate_pawn_moves(&board, &mut moves);
+
     {
         let is_white = board.current_color == PieceColor::White;
         const WHITE_KINGSIDE_EMPTY: u64 = 0x0000000000000060u64; // Squares f1 and g1 are empty
@@ -260,6 +261,17 @@ fn generate_pawn_moves(board: &Board, moves: &mut Moves) {
 
         if source_square / 8 == starting_rank {
             if !board.is_occupied((target_square + direction * 8) as usize) {
+                let r#move = Move::new(
+                    source_square as u32,
+                    (target_square + direction * 8) as u32,
+                    MoveType::DoublePush,
+                    Piece::new(PieceType::Pawn, board.current_color),
+                    PieceType::Empty,
+                );
+
+                if r#move.piece().get_type() != PieceType::Pawn {
+                    panic!("{:?}", r#move.piece());
+                }
                 moves.push(Move::new(
                     source_square as u32,
                     (target_square + direction * 8) as u32,
@@ -429,25 +441,31 @@ fn generate_pawn_moves(board: &Board, moves: &mut Moves) {
         let en_passant_file = last_double % 8;
         if en_passant_file > 0 && left_capture_square >= 0 && left_capture_square < 64 {
             if pawns & (1 << left_capture_square) != 0 {
-                moves.push(Move::new(
+                let r#move = Move::new(
                     left_capture_square as u32,
                     (last_double as i32 + direction * 8) as u32,
                     MoveType::EnPassantCapture,
                     Piece::new(PieceType::Pawn, board.current_color),
                     PieceType::Pawn,
-                ));
+                );
+
+                if pawns & (1 << left_capture_square) != 0 {
+                    moves.push(r#move);
+                }
             }
         }
 
         if en_passant_file < 7 && right_capture_square >= 0 && left_capture_square < 64 {
             if pawns & (1 << right_capture_square) != 0 {
-                moves.push(Move::new(
+                let r#move = Move::new(
                     right_capture_square as u32,
                     (last_double as i32 + direction * 8) as u32,
                     MoveType::EnPassantCapture,
                     Piece::new(PieceType::Pawn, board.current_color),
                     PieceType::Pawn,
-                ));
+                );
+
+                moves.push(r#move);
             }
         }
     }

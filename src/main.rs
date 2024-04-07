@@ -1,8 +1,7 @@
+#![feature(test)]
 use std::env;
 
 use board::{perft, Board};
-
-use crate::board::movegen::generate_moves;
 
 mod board;
 mod util;

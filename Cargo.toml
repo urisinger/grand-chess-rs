@@ -8,4 +8,8 @@ edition = "2021"
 [dependencies]
 bitflags = "1.2"
 rand = "0.8.5"
+rayon = "1.10.0"
 static_init = "1.0.3"
+
+[profile.release]
+lto = "fat"

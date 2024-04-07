@@ -54,6 +54,7 @@ impl BitBoards {
         arr
     }
 
+    #[inline]
     pub fn set_piece(&mut self, square: usize, piece: Piece) {
         if let Some(color) = piece.get_color() {
             self.occupancy[color as usize] |= 1 << square;
@@ -64,12 +65,19 @@ impl BitBoards {
         }
     }
 
-    pub fn clear_piece(&mut self, square: usize) {
+    #[inline]
+    pub fn clear_square(&mut self, square: usize) {
         self.occupancy[0] &= !(1u64 << square);
         self.occupancy[1] &= !(1u64 << square);
         for piece in PieceIter::new() {
             self[piece] &= !(1 << square);
         }
+    }
+
+    #[inline]
+    pub fn clear_piece(&mut self, square: usize, piece: Piece) {
+        self.occupancy[piece.get_color().unwrap() as usize] &= !(1u64 << square);
+        self[piece] &= !(1 << square);
     }
 
     pub fn piece_at(&self, index: usize) -> Piece {

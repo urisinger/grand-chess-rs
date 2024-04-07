@@ -86,7 +86,11 @@ impl Default for PieceType {
 
 impl From<u8> for PieceType {
     fn from(value: u8) -> Self {
-        unsafe { core::mem::transmute(value.clamp(0, 6)) }
+        if value > 6 {
+            return PieceType::Empty;
+        }
+
+        unsafe { core::mem::transmute(value) }
     }
 }
 
@@ -153,7 +157,7 @@ impl Piece {
     }
 
     pub fn get_type(&self) -> PieceType {
-        let type_u8 = (*self as u8) / 2;
+        let type_u8 = if *self as u8 >= 6 { (*self as u8) - 6 } else { *self as u8 };
 
         type_u8.into()
     }

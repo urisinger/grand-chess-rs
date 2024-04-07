@@ -1,9 +1,9 @@
-use std::{fmt, str::{FromStr}};
+use std::{fmt, str::FromStr};
 
 use super::{Piece, PieceType};
 
 #[derive(Default, Clone, Copy)]
-pub struct Move(u32);
+pub struct Move(pub u32);
 
 impl fmt::Display for Move {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -17,14 +17,13 @@ impl fmt::Display for Move {
             self.to() / 8 + 1
         ))?;
 
-        if self.move_type() == MoveType::Promote{
+        if self.move_type() == MoveType::Promote {
             f.write_str(&self.piece().to_string().to_uppercase())?;
         }
 
         Ok(())
     }
 }
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MoveType {

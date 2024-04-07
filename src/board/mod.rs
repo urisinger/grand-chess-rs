@@ -3,11 +3,12 @@ pub mod r#move;
 pub mod movegen;
 pub mod piece;
 
-use std::{fmt::Write, num::ParseIntError, str::FromStr};
+use std::{fmt::Write, num::ParseIntError, str::FromStr, sync::Mutex};
 
 use bit_board::*;
 use bitflags::bitflags;
 use piece::*;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use std::fmt;
 
@@ -163,7 +164,23 @@ impl Board {
 
         let pawns = self.bit_boards[Piece::new(PieceType::Pawn, attacker_color)];
 
-        let direction: i32 = if attacker_color == PieceColor::White { -1 } else { 1 };
+        if attacker_color == PieceColor::Black {
+            if square % 8 != 7 && (pawns & (1 << (square + 9)) != 0) {
+                return true;
+            }
+
+            if square % 8 != 0 && (pawns & (1 << (square + 7)) != 0) {
+                return true;
+            }
+        } else {
+            if square % 8 != 0 && (pawns & (1 << (square - 9)) != 0) {
+                return true;
+            }
+
+            if square % 8 != 7 && (pawns & (1 << (square - 7)) != 0) {
+                return true;
+            }
+        }
 
         let bishop_queens = self.bit_boards[Piece::new(PieceType::Bishop, attacker_color)]
             | self.bit_boards[Piece::new(PieceType::Queen, attacker_color)];
@@ -182,6 +199,15 @@ impl Board {
         false
     }
 
+    pub fn is_king_attacked(&self, color: PieceColor) -> bool {
+        let kings = self.bit_boards[Piece::new(PieceType::King, color)];
+        if kings != 0 {
+            self.is_square_attacked(kings.trailing_zeros() as usize, !color)
+        } else {
+            true
+        }
+    }
+
     pub fn make_move(&mut self, r#move: Move) {
         let to = r#move.to();
         let from = r#move.from();
@@ -189,9 +215,11 @@ impl Board {
         let capture = r#move.captured();
         let move_type = r#move.move_type();
 
-        self.bit_boards.clear_piece(to as usize);
+        if capture != PieceType::Empty {
+            self.bit_boards.clear_piece(to as usize, Piece::new(capture, !self.current_color));
+        }
         self.bit_boards.set_piece(to as usize, piece);
-        self.bit_boards.clear_piece(from as usize);
+        self.bit_boards.clear_piece(from as usize, piece);
 
         if move_type == MoveType::KingCastle {
             if piece.get_color() == Some(PieceColor::White) {
@@ -201,7 +229,7 @@ impl Board {
                 self.castle_flags &=
                     !(CastleFlags::WHITE_KINGSIDE_CASTLING | CastleFlags::WHITE_QUEENSIDE_CASTLING);
                 self.bit_boards.set_piece(ROOK_TO, Piece::WhiteRook);
-                self.bit_boards.clear_piece(ROOK_FROM);
+                self.bit_boards.clear_piece(ROOK_FROM, Piece::WhiteRook);
             } else {
                 // Move the rook from H8 to F8
                 const ROOK_FROM: usize = 63;
@@ -209,7 +237,7 @@ impl Board {
                 self.castle_flags &=
                     !(CastleFlags::BLACK_KINGSIDE_CASTLING | CastleFlags::BLACK_QUEENSIDE_CASTLING);
                 self.bit_boards.set_piece(ROOK_TO, Piece::BlackRook);
-                self.bit_boards.clear_piece(ROOK_FROM);
+                self.bit_boards.clear_piece(ROOK_FROM, Piece::BlackRook);
             }
         } else if move_type == MoveType::QueenCastle {
             if piece.get_color() == Some(PieceColor::White) {
@@ -219,7 +247,7 @@ impl Board {
                 self.castle_flags &=
                     !(CastleFlags::WHITE_KINGSIDE_CASTLING | CastleFlags::WHITE_QUEENSIDE_CASTLING);
                 self.bit_boards.set_piece(ROOK_TO, Piece::WhiteRook);
-                self.bit_boards.clear_piece(ROOK_FROM);
+                self.bit_boards.clear_piece(ROOK_FROM, Piece::WhiteRook);
             } else {
                 // Move the rook from A8 to D8
                 const ROOK_FROM: usize = 56;
@@ -227,7 +255,7 @@ impl Board {
                 self.castle_flags &=
                     !(CastleFlags::BLACK_KINGSIDE_CASTLING | CastleFlags::BLACK_QUEENSIDE_CASTLING);
                 self.bit_boards.set_piece(ROOK_TO, Piece::BlackRook);
-                self.bit_boards.clear_piece(ROOK_FROM);
+                self.bit_boards.clear_piece(ROOK_FROM, Piece::BlackRook);
             }
         }
 
@@ -267,15 +295,13 @@ impl Board {
         if move_type == MoveType::EnPassantCapture {
             let captured_pawn_square = to as i32 + if piece == Piece::WhitePawn { -8 } else { 8 };
 
-            self.bit_boards.clear_piece(captured_pawn_square as usize);
+            self.bit_boards.clear_piece(
+                captured_pawn_square as usize,
+                Piece::new(PieceType::Pawn, !self.current_color),
+            );
         }
 
-        self.last_double =
-            if piece.get_type() == PieceType::Pawn && move_type == MoveType::DoublePush {
-                Some(to)
-            } else {
-                None
-            };
+        self.last_double = if move_type == MoveType::DoublePush { Some(to) } else { None };
 
         self.current_color = !self.current_color;
     }
@@ -444,73 +470,38 @@ impl Board {
 
 #[cfg(test)]
 mod tests {
-    use crate::util::print_bitboard;
 
-    use super::{
-        movegen::generate_moves,
-        piece::{Piece, PieceType},
-        Board,
-    };
+    use crate::board::perft;
+
+    use super::Board;
+
+    extern crate test;
 
     #[test]
     fn perft_test() {
-        assert_eq!(perft(Board::default(), 1), 20);
-        assert_eq!(perft(Board::default(), 2), 400);
-        assert_eq!(perft(Board::default(), 3), 8_902);
-        assert_eq!(perft(Board::default(), 4), 197_281);
-        assert_eq!(perft(Board::default(), 5), 4_865_609);
         assert_eq!(perft(Board::default(), 6), 119_060_324);
-    }
-
-    fn perft(board: Board, depth: u32) -> u64 {
-        if depth <= 0 {
-            return 1;
-        }
-
-        let moves = generate_moves(&board);
-
-        let mut nodes = 0;
-        for i in 0..moves.len() {
-            let mut new_board = board.clone();
-
-            if new_board.is_square_attacked(
-                new_board.bit_boards[Piece::new(PieceType::King, new_board.current_color)]
-                    .trailing_zeros() as usize,
-                !new_board.current_color,
-            ) {
-                continue;
-            }
-
-            new_board.make_move(moves[i]);
-            nodes += perft(new_board, depth - 1);
-        }
-
-        nodes
     }
 }
 
 pub fn perft(board: Board, depth: u32) -> u64 {
-    let mut nodes = 0;
+    let nodes = Mutex::new(0);
     let moves = generate_moves(&board);
 
-    for i in 0..moves.len() {
+    moves.par_iter().for_each(|&r#move| {
         let mut new_board = board.clone();
 
-        new_board.make_move(moves[i]);
-        if new_board.is_square_attacked(
-            new_board.bit_boards[Piece::new(PieceType::King, !new_board.current_color)]
-                .trailing_zeros() as usize,
-            new_board.current_color,
-        ) {
-            continue;
+        new_board.make_move(r#move);
+        if new_board.is_king_attacked(board.current_color) {
+            return;
         }
         let result = perft_helper(new_board, depth - 1);
-        println!("{} {}", moves[i], result);
-        nodes += result;
-    }
+        println!("{} {}", r#move, result);
+        *nodes.lock().unwrap() += result;
+    });
 
-    println!("\n{}", nodes);
-    nodes
+    let nodes_u32 = *nodes.lock().unwrap();
+    println!("\n{}", nodes_u32);
+    nodes_u32
 }
 
 fn perft_helper(board: Board, depth: u32) -> u64 {
@@ -525,11 +516,7 @@ fn perft_helper(board: Board, depth: u32) -> u64 {
         let mut new_board = board.clone();
 
         new_board.make_move(moves[i]);
-        if new_board.is_square_attacked(
-            new_board.bit_boards[Piece::new(PieceType::King, !new_board.current_color)]
-                .trailing_zeros() as usize,
-            new_board.current_color,
-        ) {
+        if new_board.is_king_attacked(board.current_color) {
             continue;
         }
         nodes += perft_helper(new_board, depth - 1);
