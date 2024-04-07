@@ -47,32 +47,33 @@ pub enum PieceType {
     Empty = 6,
 }
 
-impl ToString for PieceType{
+impl ToString for PieceType {
     fn to_string(&self) -> String {
-       match *self {
-        PieceType::Pawn => 'p',
-        PieceType::Knight => 'n',
-        PieceType::Bishop => 'b',
-        PieceType::Rook => 'r',
-        PieceType::Queen => 'q',
-        PieceType::King => 'k',
-        PieceType::Empty => ' ',        
-        }.to_string()
+        match *self {
+            PieceType::Pawn => 'p',
+            PieceType::Knight => 'n',
+            PieceType::Bishop => 'b',
+            PieceType::Rook => 'r',
+            PieceType::Queen => 'q',
+            PieceType::King => 'k',
+            PieceType::Empty => ' ',
+        }
+        .to_string()
     }
 }
 
-impl FromStr for PieceType{
+impl FromStr for PieceType {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s.as_bytes().get(0).ok_or(())? {
             b'p' => PieceType::Pawn,
-        b'n' => PieceType::Knight ,
-        b'b' => PieceType::Bishop,
-        b'r' => PieceType::Rook ,
-        b'q' => PieceType::Queen,
-        b'k' => PieceType::King,
-        b' ' => PieceType::Empty ,      
-        _ =>   return Err(())
+            b'n' => PieceType::Knight,
+            b'b' => PieceType::Bishop,
+            b'r' => PieceType::Rook,
+            b'q' => PieceType::Queen,
+            b'k' => PieceType::King,
+            b' ' => PieceType::Empty,
+            _ => return Err(()),
         })
     }
 }
@@ -122,8 +123,9 @@ impl ToString for Piece {
             Piece::BlackRook => 'R',
             Piece::BlackQueen => 'Q',
             Piece::BlackKing => 'K',
-            Piece::Empty => ' ',        
-        }.to_string()
+            Piece::Empty => ' ',
+        }
+        .to_string()
     }
 }
 
@@ -134,6 +136,7 @@ impl Default for Piece {
 }
 
 impl Piece {
+    #[inline]
     pub fn new(piece_type: PieceType, piece_color: PieceColor) -> Piece {
         if piece_type == PieceType::Empty {
             return Self::Empty;

@@ -399,52 +399,18 @@ fn get_occupancy(index: u32, mut mask: u64) -> u64 {
     occupancy
 }
 
-fn random_magic() -> u64 {
-    return random::<u64>() & random::<u64>() & random::<u64>();
-}
-
-#[derive(Debug)]
-pub enum MagicNumberErr {
-    NotFound,
-}
-
-pub fn find_magic(mask: u64, attacks: &[u64; 4096]) -> Result<u64, MagicNumberErr> {
-    let mut used = [0u64; 4096];
-
-    let occupancies: [u64; 4096] = from_fn(|index| get_occupancy(index as u32, mask));
-
-    let n = mask.count_ones();
-
-    for _ in 0..10000000 {
-        let magic = random_magic();
-        if ((mask.overflowing_mul(magic).0) & 0xFF00000000000000u64).count_ones() > 6 {
-            continue;
-        }
-
-        used.fill(0);
-
-        let mut fail = false;
-        for i in 0..(1 << n) {
-            let key = magic_key(magic, occupancies[i], n) as usize;
-
-            if used[key] == 0 {
-                used[key] = attacks[i];
-            } else if used[key] != attacks[i] {
-                fail = true;
-                break;
-            }
-        }
-
-        if !fail {
-            return Ok(magic);
-        }
-    }
-
-    return Err(MagicNumberErr::NotFound);
-}
-
 pub const fn magic_key(magic: u64, occupancy: u64, shift: u32) -> usize {
     ((occupancy.overflowing_mul(magic).0) >> (64 - shift)) as usize
+}
+
+pub fn bishop_attacks(square: usize, occupancy: u64) -> u64 {
+    let mask = BISHOP_MASKS[square];
+    BISHOP_ATTACKS[square][magic_key(BISHOP_MAGICS[square], occupancy & mask, mask.count_ones())]
+}
+
+pub fn rook_attacks(square: usize, occupancy: u64) -> u64 {
+    let mask = ROOK_MASKS[square];
+    ROOK_ATTACKS[square][magic_key(ROOK_MAGICS[square], occupancy & mask, mask.count_ones())]
 }
 
 #[cfg(test)]
@@ -463,9 +429,9 @@ pub mod tests {
             for occupancy_index in 0..4096 {
                 let occupancy = get_occupancy(occupancy_index, mask);
                 let correct_attack = generate_bishop_attack(square, occupancy);
-                let magic_attack = &BISHOP_ATTACKS[square][magic_key(magic, occupancy, n)];
+                let magic_attack = BISHOP_ATTACKS[square][magic_key(magic, occupancy, n)];
 
-                assert_eq!(correct_attack, *magic_attack);
+                assert_eq!(correct_attack, magic_attack);
             }
         }
     }

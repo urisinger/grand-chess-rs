@@ -196,7 +196,8 @@ pub fn generate_moves(board: &Board) -> Moves {
                 &board,
                 &mut moves,
                 square as usize,
-                KING_ATTACKS[square as usize] & !board.bit_boards.col_occupancy(board.current_color)
+                KING_ATTACKS[square as usize]
+                    & !board.bit_boards.col_occupancy(board.current_color),
             );
         }
     }
@@ -323,7 +324,7 @@ fn generate_pawn_moves(board: &Board, moves: &mut Moves) {
 
     while left_captures != 0 {
         let target_square = left_captures.trailing_zeros();
-        let source_square = left_captures as i32 - (direction * 8) - 1;
+        let source_square = target_square as i32 - (direction * 8) + 1;
 
         let promotion_rank = if is_white { 7 } else { 0 };
 
@@ -373,7 +374,7 @@ fn generate_pawn_moves(board: &Board, moves: &mut Moves) {
 
     while right_captures != 0 {
         let target_square = right_captures.trailing_zeros();
-        let source_square = right_captures as i32 - (direction * 8) - 1;
+        let source_square = target_square as i32 - (direction * 8) - 1;
 
         let promotion_rank = if is_white { 7 } else { 0 };
 
