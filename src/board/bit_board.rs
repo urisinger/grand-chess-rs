@@ -1,8 +1,6 @@
 use std::ops::Index;
 use std::ops::IndexMut;
 
-use crate::util::print_bitboard;
-
 use super::piece::Piece;
 use super::piece::PieceColor;
 use super::piece::PieceIter;

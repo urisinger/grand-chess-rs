@@ -3,7 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use crate::{board::CastleFlags, util::print_bitboard};
+use crate::board::CastleFlags;
 
 use self::bitmasks::{
     magic_key, BISHOP_ATTACKS, BISHOP_MAGICS, BISHOP_MASKS, KING_ATTACKS, KNIGHT_ATTACKS,

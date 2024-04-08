@@ -1,6 +1,5 @@
 use std::array::from_fn;
 
-use rand::random;
 use static_init::dynamic;
 #[dynamic]
 pub static KNIGHT_ATTACKS: [u64; 64] = generate_knight_attacks();

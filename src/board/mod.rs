@@ -2,22 +2,20 @@ pub mod bit_board;
 pub mod r#move;
 pub mod movegen;
 pub mod piece;
+mod util;
 
-use std::{fmt::Write, num::ParseIntError, str::FromStr, sync::Mutex};
+use std::{fmt::Write, num::ParseIntError};
 
 use bit_board::*;
 use bitflags::bitflags;
 use piece::*;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use std::fmt;
 
 use crate::board::movegen::generate_moves;
 
 use self::{
-    movegen::bitmasks::{
-        bishop_attacks, magic_key, rook_attacks, BISHOP_ATTACKS, BISHOP_MAGICS, KNIGHT_ATTACKS,
-    },
+    movegen::bitmasks::{bishop_attacks, rook_attacks, KING_ATTACKS, KNIGHT_ATTACKS},
     r#move::{Move, MoveType},
 };
 
@@ -161,6 +159,10 @@ impl Board {
         {
             return true;
         };
+        if KING_ATTACKS[square] & self.bit_boards[Piece::new(PieceType::King, attacker_color)] != 0
+        {
+            return true;
+        }
 
         let pawns = self.bit_boards[Piece::new(PieceType::Pawn, attacker_color)];
 
@@ -219,7 +221,12 @@ impl Board {
             self.bit_boards.clear_piece(to as usize, Piece::new(capture, !self.current_color));
         }
         self.bit_boards.set_piece(to as usize, piece);
-        self.bit_boards.clear_piece(from as usize, piece);
+        if move_type == MoveType::Promote {
+            self.bit_boards
+                .clear_piece(from as usize, Piece::new(PieceType::Pawn, self.current_color));
+        } else {
+            self.bit_boards.clear_piece(from as usize, piece);
+        }
 
         if move_type == MoveType::KingCastle {
             if piece.get_color() == Some(PieceColor::White) {
@@ -470,38 +477,70 @@ impl Board {
 
 #[cfg(test)]
 mod tests {
+    use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
     use crate::board::perft;
 
     use super::Board;
 
-    extern crate test;
-
     #[test]
     fn perft_test() {
-        assert_eq!(perft(Board::default(), 6), 119_060_324);
+        let fen_tests = [
+            (Board::default(), 6, 119_060_324),
+            (
+                Board::from_fen(
+                    "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+                )
+                .unwrap(),
+                5,
+                193_690_690,
+            ),
+            ((Board::from_fen("4k3/8/8/8/8/8/8/4K2R w K - 0 1").unwrap(), 6, 764643)),
+        ];
+
+        fen_tests.par_iter().for_each(|(board, depth, target)| {
+            assert_eq!(perft(board, *depth), *target);
+        });
     }
 }
 
-pub fn perft(board: Board, depth: u32) -> u64 {
-    let nodes = Mutex::new(0);
+pub fn perft(board: &Board, depth: u32) -> u64 {
+    let mut nodes = 0;
     let moves = generate_moves(&board);
 
-    moves.par_iter().for_each(|&r#move| {
+    moves.iter().for_each(|&r#move| {
         let mut new_board = board.clone();
 
         new_board.make_move(r#move);
         if new_board.is_king_attacked(board.current_color) {
             return;
         }
+
+        if r#move.move_type() == MoveType::KingCastle {
+            let castle_target = if board.current_color == PieceColor::White { 5 } else { 61 };
+            if new_board.is_square_attacked(castle_target, new_board.current_color) {
+                return;
+            }
+
+            if board.is_king_attacked(board.current_color) {
+                return;
+            }
+        } else if r#move.move_type() == MoveType::QueenCastle {
+            let castle_target = if board.current_color == PieceColor::White { 3 } else { 59 };
+            if new_board.is_square_attacked(castle_target, new_board.current_color) {
+                return;
+            }
+            if board.is_king_attacked(board.current_color) {
+                return;
+            }
+        }
         let result = perft_helper(new_board, depth - 1);
         println!("{} {}", r#move, result);
-        *nodes.lock().unwrap() += result;
+        nodes += result;
     });
 
-    let nodes_u32 = *nodes.lock().unwrap();
-    println!("\n{}", nodes_u32);
-    nodes_u32
+    println!("\n{}", nodes);
+    nodes
 }
 
 fn perft_helper(board: Board, depth: u32) -> u64 {
@@ -512,15 +551,35 @@ fn perft_helper(board: Board, depth: u32) -> u64 {
     let moves = generate_moves(&board);
 
     let mut nodes = 0;
-    for i in 0..moves.len() {
+    moves.iter().for_each(|&r#move| {
         let mut new_board = board.clone();
 
-        new_board.make_move(moves[i]);
+        new_board.make_move(r#move);
         if new_board.is_king_attacked(board.current_color) {
-            continue;
+            return;
         }
-        nodes += perft_helper(new_board, depth - 1);
-    }
+
+        if r#move.move_type() == MoveType::KingCastle {
+            let castle_target = if board.current_color == PieceColor::White { 5 } else { 61 };
+            if new_board.is_square_attacked(castle_target, new_board.current_color) {
+                return;
+            }
+            if board.is_king_attacked(board.current_color) {
+                return;
+            }
+        } else if r#move.move_type() == MoveType::QueenCastle {
+            let castle_target = if board.current_color == PieceColor::White { 3 } else { 59 };
+            if new_board.is_square_attacked(castle_target, new_board.current_color) {
+                return;
+            }
+            if board.is_king_attacked(board.current_color) {
+                return;
+            }
+        }
+
+        let result = perft_helper(new_board, depth - 1);
+        nodes += result;
+    });
 
     nodes
 }

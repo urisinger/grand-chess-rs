@@ -1,4 +1,4 @@
-use std::{fmt, str::FromStr};
+use std::fmt;
 
 use super::{Piece, PieceType};
 
@@ -18,7 +18,7 @@ impl fmt::Display for Move {
         ))?;
 
         if self.move_type() == MoveType::Promote {
-            f.write_str(&self.piece().to_string().to_uppercase())?;
+            f.write_str(&self.piece().to_string().to_lowercase())?;
         }
 
         Ok(())
@@ -119,6 +119,8 @@ mod tests {
     #[test]
     fn test_moves() {
         test_move(0, 63, MoveType::Promote, Piece::BlackKing, PieceType::Empty);
+
+        test_move(0, 63, MoveType::KingCastle, Piece::WhiteBishop, PieceType::Rook);
     }
 
     fn test_move(from: u32, to: u32, move_type: MoveType, piece: Piece, captured: PieceType) {

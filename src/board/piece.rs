@@ -1,5 +1,4 @@
-use core::fmt;
-use std::{fmt::Write, ops::Not, str::FromStr};
+use std::{ops::Not, str::FromStr};
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 #[repr(u8)]
@@ -114,22 +113,7 @@ pub enum Piece {
 
 impl ToString for Piece {
     fn to_string(&self) -> String {
-        match *self {
-            Piece::WhitePawn => 'p',
-            Piece::WhiteKnight => 'n',
-            Piece::WhiteBishop => 'b',
-            Piece::WhiteRook => 'r',
-            Piece::WhiteQueen => 'q',
-            Piece::WhiteKing => 'k',
-            Piece::BlackPawn => 'P',
-            Piece::BlackKnight => 'N',
-            Piece::BlackBishop => 'B',
-            Piece::BlackRook => 'R',
-            Piece::BlackQueen => 'Q',
-            Piece::BlackKing => 'K',
-            Piece::Empty => ' ',
-        }
-        .to_string()
+        char::from(*self).to_string()
     }
 }
 
