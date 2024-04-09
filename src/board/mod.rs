@@ -4,11 +4,12 @@ pub mod movegen;
 pub mod piece;
 mod util;
 
-use std::{fmt::Write, num::ParseIntError};
+use std::{fmt::Write, num::ParseIntError, sync::Mutex};
 
 use bit_board::*;
 use bitflags::bitflags;
 use piece::*;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use std::fmt;
 
@@ -133,6 +134,7 @@ impl Board {
                 'k' => CastleFlags::BLACK_KINGSIDE_CASTLING,
                 'Q' => CastleFlags::WHITE_QUEENSIDE_CASTLING,
                 'q' => CastleFlags::BLACK_QUEENSIDE_CASTLING,
+                '-' => break,
                 _ => return Err(FenError::NoSuchCastle(c)),
             }
         }
@@ -477,9 +479,10 @@ impl Board {
 
 #[cfg(test)]
 mod tests {
-    use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-    use crate::board::perft;
+    use std::time::Instant;
+
+    use crate::board::par_perft;
 
     use super::Board;
 
@@ -495,13 +498,66 @@ mod tests {
                 5,
                 193_690_690,
             ),
-            ((Board::from_fen("4k3/8/8/8/8/8/8/4K2R w K - 0 1").unwrap(), 6, 764643)),
+            (Board::from_fen("4k3/8/8/8/8/8/8/4K2R w K - 0 1").unwrap(), 6, 764_643),
+            (Board::from_fen("8/1n4N1/2k5/8/8/5K2/1N4n1/8 b - - 0 1").unwrap(), 6, 8_503_277),
+            (Board::from_fen("8/1k6/8/5N2/8/4n3/8/2K5 b - - 0 1").unwrap(), 6, 3_147_566),
+            (Board::from_fen("8/8/3K4/3Nn3/3nN3/4k3/8/8 b - - 0 1").unwrap(), 6, 4_405_103),
+            (Board::from_fen("B6b/8/8/8/2K5/4k3/8/b6B w - - 0 1").unwrap(), 6, 22_823_890),
+            (Board::from_fen("r3k2r/8/8/8/8/8/8/2R1K2R b Kkq - 0 1").unwrap(), 6, 185_959_088),
+            (Board::from_fen("r3k2r/8/8/8/8/8/8/R3K1R1 b Qkq - 0 1").unwrap(), 6, 190_755_813),
+            (Board::from_fen("R6r/8/8/2K5/5k2/8/8/r6R w - - 0 1").unwrap(), 6, 525_169_084),
+            (Board::from_fen("8/2k1p3/3pP3/3P2K1/8/8/8/8 b - - 0 1").unwrap(), 6, 34_822),
+            (Board::from_fen("8/8/8/8/8/4k3/4P3/4K3 w - - 0 1").unwrap(), 6, 11_848),
+            (Board::from_fen("8/3k4/3p4/8/3P4/3K4/8/8 b - - 0 1").unwrap(), 6, 158_065),
         ];
 
-        fen_tests.par_iter().for_each(|(board, depth, target)| {
-            assert_eq!(perft(board, *depth), *target);
+        let start = Instant::now();
+        fen_tests.iter().for_each(|(board, depth, target)| {
+            assert_eq!(par_perft(board, *depth), *target);
         });
+        let nodes: u64 = fen_tests.iter().map(|b| b.2).sum();
+        println!("nps: {}", (nodes as f64 / start.elapsed().as_secs_f64()) as u64);
     }
+}
+
+pub fn par_perft(board: &Board, depth: u32) -> u64 {
+    let nodes = Mutex::new(0);
+    let moves = generate_moves(&board);
+
+    moves.par_iter().for_each(|&r#move| {
+        let mut new_board = board.clone();
+
+        new_board.make_move(r#move);
+        if new_board.is_king_attacked(board.current_color) {
+            return;
+        }
+
+        if r#move.move_type() == MoveType::KingCastle {
+            let castle_target = if board.current_color == PieceColor::White { 5 } else { 61 };
+            if new_board.is_square_attacked(castle_target, new_board.current_color) {
+                return;
+            }
+
+            if board.is_king_attacked(board.current_color) {
+                return;
+            }
+        } else if r#move.move_type() == MoveType::QueenCastle {
+            let castle_target = if board.current_color == PieceColor::White { 3 } else { 59 };
+            if new_board.is_square_attacked(castle_target, new_board.current_color) {
+                return;
+            }
+            if board.is_king_attacked(board.current_color) {
+                return;
+            }
+        }
+        let result = perft_helper(new_board, depth - 1);
+        println!("{} {}", r#move, result);
+        *nodes.lock().unwrap() += result;
+    });
+
+    let result = *nodes.lock().unwrap();
+    println!("\n{}", result);
+    result
 }
 
 pub fn perft(board: &Board, depth: u32) -> u64 {
