@@ -9,6 +9,7 @@ bitflags = "1.2"
 rand = "0.8.5"
 rayon = "1.10.0"
 static_init = "1.0.3"
+vampirc-uci = "0.11.1"
 
 [profile.dev]
 opt-level = 2

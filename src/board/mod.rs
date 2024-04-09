@@ -516,7 +516,8 @@ mod tests {
             assert_eq!(par_perft(board, *depth), *target);
         });
         let nodes: u64 = fen_tests.iter().map(|b| b.2).sum();
-        println!("nps: {}", (nodes as f64 / start.elapsed().as_secs_f64()) as u64);
+        let time = start.elapsed().as_secs_f64();
+        println!("time: {}, nps: {}", time, (nodes as f64 / time) as u64);
     }
 }
 
