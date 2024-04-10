@@ -1,7 +1,7 @@
 use std::io::{BufRead, Write};
 
 use vampirc_uci::{
-    parse_one, UciFen, UciMessage, UciMove, UciPiece, UciSearchControl, UciSquare, UciTimeControl,
+    parse_one, UciInfoAttribute, UciMessage, UciMove, UciSearchControl, UciTimeControl,
 };
 
 pub trait Engine {
@@ -9,9 +9,9 @@ pub trait Engine {
         (None, None)
     }
 
-    fn best_move<W: Write>(
+    fn best_move<W: Write + Send + Sync>(
         &mut self,
-        writer: &W,
+        writer: &InfoWriter<W>,
         time_control: Option<UciTimeControl>,
         search_control: Option<UciSearchControl>,
     ) -> UciMove;
@@ -22,6 +22,20 @@ pub trait Engine {
 
     fn stop(&self) -> bool {
         false
+    }
+}
+
+pub struct InfoWriter<'a, W: Write + Send + Sync> {
+    writer: &'a mut W,
+}
+
+impl<'a, W: Write + Send + Sync> InfoWriter<'a, W> {
+    pub fn new(writer: &'a mut W) -> Self {
+        Self { writer }
+    }
+
+    pub fn write_info(&mut self, info: Vec<UciInfoAttribute>) {
+        self.writer.write_fmt(format_args!("{}\n", UciMessage::Info(info))).unwrap();
     }
 }
 
@@ -41,26 +55,32 @@ impl<R: BufRead, W: Write + Send + Sync, E: Engine> UciConnection<R, W, E> {
         for line in self.reader.lines() {
             match parse_one(&line.unwrap()) {
                 UciMessage::Uci => {
-                    self.writer.write_fmt(format_args!("{}", UciMessage::UciOk)).unwrap();
+                    self.writer.write_fmt(format_args!("{}\n", UciMessage::UciOk)).unwrap();
 
                     let id = E::id();
 
                     self.writer
-                        .write_fmt(format_args!("{}", UciMessage::Id { name: id.0, author: id.1 }))
+                        .write_fmt(format_args!(
+                            "{}\n",
+                            UciMessage::Id { name: id.0, author: id.1 }
+                        ))
                         .unwrap();
                 }
                 UciMessage::IsReady => {
                     self.engine.stop();
 
-                    self.writer.write_fmt(format_args!("{}", UciMessage::ReadyOk)).unwrap();
+                    self.writer.write_fmt(format_args!("{}\n", UciMessage::ReadyOk)).unwrap();
                 }
                 UciMessage::Go { time_control, search_control } => {
-                    let best_move =
-                        self.engine.best_move(&self.writer, time_control, search_control);
+                    let best_move = self.engine.best_move(
+                        &InfoWriter::new(&mut self.writer),
+                        time_control,
+                        search_control,
+                    );
 
                     self.writer
                         .write_fmt(format_args!(
-                            "{}",
+                            "{}\n",
                             UciMessage::BestMove { best_move, ponder: None }
                         ))
                         .unwrap();
@@ -76,7 +96,7 @@ impl<R: BufRead, W: Write + Send + Sync, E: Engine> UciConnection<R, W, E> {
                 }
                 UciMessage::UciNewGame => {
                     self.engine.new_game();
-                    self.writer.write_fmt(format_args!("{}", UciMessage::ReadyOk)).unwrap();
+                    self.writer.write_fmt(format_args!("{}\n", UciMessage::ReadyOk)).unwrap();
                 }
                 UciMessage::Stop => {
                     self.engine.stop();

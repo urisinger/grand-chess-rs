@@ -38,6 +38,10 @@ pub struct Board {
     pub current_color: PieceColor,
     pub castle_flags: CastleFlags,
     pub last_double: Option<u32>,
+
+    pub hash: u64,
+
+    pub eval: i32,
 }
 
 #[derive(Debug)]

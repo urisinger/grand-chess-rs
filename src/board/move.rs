@@ -55,6 +55,17 @@ impl Move {
     }
 
     #[inline]
+    pub fn unpack(self) -> (u32, u32, MoveType, Piece, PieceType) {
+        (
+            self.0 & 0b111111,
+            (self.0 >> 6) & 0b111111,
+            (((self.0 >> 12) & 0b1111) as u8).into(),
+            Piece::from(((self.0 >> 16) & 0b1111) as u8),
+            PieceType::from(((self.0 >> 20) & 0b111) as u8),
+        )
+    }
+
+    #[inline]
     pub fn to(self) -> u32 {
         self.0 & 0b111111
     }
