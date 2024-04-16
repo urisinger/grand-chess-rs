@@ -84,6 +84,7 @@ impl Default for PieceType {
 }
 
 impl From<u8> for PieceType {
+    #[inline]
     fn from(value: u8) -> Self {
         if value > 6 {
             return PieceType::Empty;
@@ -97,16 +98,16 @@ impl From<u8> for PieceType {
 #[repr(u8)]
 pub enum Piece {
     WhitePawn = 0,
-    WhiteKnight = 1,
-    WhiteBishop = 2,
-    WhiteRook = 3,
-    WhiteQueen = 4,
-    WhiteKing = 5,
-    BlackPawn = 6,
-    BlackKnight = 7,
-    BlackBishop = 8,
-    BlackRook = 9,
-    BlackQueen = 10,
+    BlackPawn = 1,
+    WhiteKnight = 2,
+    BlackKnight = 3,
+    WhiteBishop = 4,
+    BlackBishop = 5,
+    WhiteRook = 6,
+    BlackRook = 7,
+    WhiteQueen = 8,
+    BlackQueen = 9,
+    WhiteKing = 10,
     BlackKing = 11,
     Empty = 12,
 }
@@ -126,24 +127,22 @@ impl Default for Piece {
 impl Piece {
     #[inline]
     pub fn new(piece_type: PieceType, piece_color: PieceColor) -> Piece {
-        if piece_type == PieceType::Empty {
-            return Self::Empty;
-        }
-        (piece_color as u8 * 6 + piece_type as u8).try_into().unwrap()
+        (piece_color as u8 + piece_type as u8 * 2).into()
     }
 
-    pub fn get_color(&self) -> Option<PieceColor> {
-        match *self as u8 {
-            0..=5 => Some(PieceColor::White),
-            6..=11 => Some(PieceColor::Black),
-            _ => None,
-        }
+    #[inline]
+    pub fn flip_color(self) -> Piece {
+        unsafe { core::mem::transmute(self as u8 ^ 1) }
     }
 
+    #[inline]
+    pub fn get_color(&self) -> PieceColor {
+        unsafe { core::mem::transmute(*self as u8 & 1) }
+    }
+
+    #[inline]
     pub fn get_type(&self) -> PieceType {
-        let type_u8 = if *self as u8 >= 6 { (*self as u8) - 6 } else { *self as u8 };
-
-        type_u8.into()
+        unsafe { core::mem::transmute(*self as u8 / 2) }
     }
 }
 

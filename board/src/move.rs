@@ -2,8 +2,8 @@ use std::fmt;
 
 use super::{Piece, PieceType};
 
-#[derive(Default, Clone, Copy)]
-pub struct Move(pub u32);
+#[derive(Default, Clone, Copy, Eq, PartialEq)]
+pub struct Move(u32);
 
 impl fmt::Display for Move {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -25,14 +25,14 @@ impl fmt::Display for Move {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MoveType {
     QuietMove = 0,
     DoublePush = 1,
     KingCastle = 2,
     QueenCastle = 3,
-    Capture = 4,
-    EnPassantCapture = 5,
+    EnPassantCapture = 4,
+    Capture = 5,
     Promote = 6,
 }
 
@@ -44,21 +44,26 @@ impl From<u8> for MoveType {
 
 impl Move {
     #[inline]
+    pub fn null() -> Self {
+        Self(0)
+    }
+
+    #[inline]
     pub fn new(from: u32, to: u32, move_type: MoveType, piece: Piece, captured: PieceType) -> Self {
         let inner = ((captured as u32) & 0b111) << 20
             | ((piece as u32) & 0b1111) << 16
             | ((move_type as u32) & 0b1111) << 12
-            | ((from & 0b111111) << 6)
-            | (to & 0b111111);
+            | ((to & 0b111111) << 6)
+            | (from & 0b111111);
 
         Self(inner)
     }
 
     #[inline]
-    pub fn unpack(self) -> (u32, u32, MoveType, Piece, PieceType) {
+    pub fn unpack(self) -> (usize, usize, MoveType, Piece, PieceType) {
         (
-            self.0 & 0b111111,
-            (self.0 >> 6) & 0b111111,
+            (self.0 & 0b111111) as usize,
+            ((self.0 >> 6) & 0b111111) as usize,
             (((self.0 >> 12) & 0b1111) as u8).into(),
             Piece::from(((self.0 >> 16) & 0b1111) as u8),
             PieceType::from(((self.0 >> 20) & 0b111) as u8),
@@ -66,12 +71,12 @@ impl Move {
     }
 
     #[inline]
-    pub fn to(self) -> u32 {
+    pub fn from(self) -> u32 {
         self.0 & 0b111111
     }
 
     #[inline]
-    pub fn from(self) -> u32 {
+    pub fn to(self) -> u32 {
         (self.0 >> 6) & 0b111111
     }
 
@@ -91,13 +96,13 @@ impl Move {
     }
 
     #[inline]
-    pub fn set_to(&mut self, to: u32) {
+    pub fn set_from(&mut self, to: u32) {
         self.0 &= !0b111111;
         self.0 |= to & 0b111111;
     }
 
     #[inline]
-    pub fn set_from(&mut self, from: u32) {
+    pub fn set_to(&mut self, from: u32) {
         self.0 &= !(0b111111 << 6);
         self.0 |= (from & 0b111111) << 6;
     }
@@ -123,7 +128,7 @@ impl Move {
 
 #[cfg(test)]
 mod tests {
-    use crate::board::{r#move::Move, Piece, PieceType};
+    use crate::{r#move::Move, Piece, PieceType};
 
     use super::MoveType;
 
@@ -143,6 +148,8 @@ mod tests {
             assert_eq!(r#move.move_type(), move_type);
             assert_eq!(r#move.piece(), piece);
             assert_eq!(r#move.captured(), captured);
+
+            assert_eq!(r#move.unpack(), (from as usize, to as usize, move_type, piece, captured))
         }
 
         {
@@ -159,6 +166,8 @@ mod tests {
             assert_eq!(r#move.move_type(), move_type);
             assert_eq!(r#move.piece(), piece);
             assert_eq!(r#move.captured(), captured);
+
+            assert_eq!(r#move.unpack(), (from as usize, to as usize, move_type, piece, captured))
         }
     }
 }

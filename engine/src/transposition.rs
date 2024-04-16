@@ -1,8 +1,8 @@
-use crate::board::r#move::Move;
+use board::r#move::Move;
 
 use super::MATE_SCORE;
 
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone, Copy, PartialEq, Eq)]
 pub enum HashFlags {
     #[default]
     Exsact = 0,
@@ -12,15 +12,15 @@ pub enum HashFlags {
 
 #[derive(Default, Clone, Copy)]
 pub struct THash {
-    key: u64,
-    depth: u32,
-    score: i32,
-    flags: HashFlags,
-    best_move: Move,
+    pub key: u64,
+    pub depth: i32,
+    pub score: i32,
+    pub flags: HashFlags,
+    pub best_move: Move,
 }
 
 impl THash {
-    pub fn new(key: u64, depth: u32, score: i32, flags: HashFlags, best_move: Move) -> Self {
+    pub fn new(key: u64, depth: i32, score: i32, best_move: Move, flags: HashFlags) -> Self {
         Self { key, depth, score, flags, best_move }
     }
 }
@@ -55,7 +55,9 @@ impl TTable {
             entry.score -= ply as i32;
         }
 
-        self.entries[(entry.key % self.entries.len() as u64) as usize] = entry;
+        if entry.depth >= self.entries[(entry.key % self.entries.len() as u64) as usize].depth {
+            self.entries[(entry.key % self.entries.len() as u64) as usize] = entry;
+        }
     }
 
     pub fn probe_entry(&self, key: u64, ply: u32) -> Option<THash> {

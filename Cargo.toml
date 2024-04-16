@@ -1,15 +1,15 @@
+[workspace]
+members = ["board", "engine", "uci"]
+
 [package]
 name = "grand_chess_rs"
 version = "0.1.0"
 edition = "2021"
 
-
 [dependencies]
-bitflags = "1.2"
-rand = "0.8.5"
-rayon = "1.10.0"
-static_init = "1.0.3"
-vampirc-uci = "0.11.1"
+engine = {path = "engine/"} 
+uci = {path = "uci/"}
+board = {path = "board/"}
 
 [profile.dev]
 opt-level = 2

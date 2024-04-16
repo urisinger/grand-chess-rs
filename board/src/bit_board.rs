@@ -54,13 +54,10 @@ impl BitBoards {
 
     #[inline]
     pub fn set_piece(&mut self, square: usize, piece: Piece) {
-        if let Some(color) = piece.get_color() {
-            self.occupancy[color as usize] |= 1 << square;
+        let color = piece.get_color();
+        self.occupancy[color as usize] |= 1 << square;
 
-            self[piece] |= 1 << square;
-        } else {
-            panic!("set_piece cant be used on an empty piece");
-        }
+        self[piece] |= 1 << square;
     }
 
     #[inline]
@@ -74,7 +71,7 @@ impl BitBoards {
 
     #[inline]
     pub fn clear_piece(&mut self, square: usize, piece: Piece) {
-        self.occupancy[piece.get_color().unwrap() as usize] &= !(1u64 << square);
+        self.occupancy[piece.get_color() as usize] &= !(1u64 << square);
         self[piece] &= !(1 << square);
     }
 
