@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 pub mod bit_board;
 mod hash;
 pub mod r#move;
@@ -5,16 +6,13 @@ pub mod movegen;
 pub mod piece;
 mod scores;
 
-use std::{fmt::Write, num::ParseIntError, sync::Mutex};
+use std::{fmt::Write, num::ParseIntError};
 
 use bit_board::*;
 use bitflags::bitflags;
 use piece::*;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use std::fmt;
-
-use crate::movegen::generate_moves;
 
 use self::{
     hash::{CASTLE_KEYS, DOUBLE_PUSH_KEYS, PIECE_KEYS, SIDE_KEY},

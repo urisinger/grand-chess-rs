@@ -1,5 +1,6 @@
-#![feature(generic_const_exprs)]
-mod nnue;
+#![feature(generic_const_exprs, test)]
+#![allow(incomplete_features)]
+pub mod nnue;
 mod transposition;
 pub mod uci;
 

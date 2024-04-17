@@ -5,6 +5,5 @@ edition = "2021"
 
 [dependencies]
 board = {path = "../board/"}
-bytemuck = "1.15.0"
 byteorder = "1.5.0"
 uci = {path = "../uci/"}

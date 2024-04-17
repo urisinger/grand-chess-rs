@@ -1,4 +1,4 @@
-mod feature_transformer;
-mod half_kp;
-mod layers;
-mod network;
+pub mod feature_transformer;
+pub mod half_kp;
+pub mod layers;
+pub mod network;
