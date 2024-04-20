@@ -3,7 +3,14 @@ use std::io::Read;
 use super::layers::{crelu::ReluLayer, linear_layer::LinearLayer, Layer};
 
 #[repr(align(64))]
-pub struct Network<const L_1: usize, const L_2: usize, const L_3: usize> {
+pub struct Network<const L_1: usize, const L_2: usize, const L_3: usize>
+where
+    [(); L_1 * L_2]:,
+
+    [(); L_2 * L_3]:,
+
+    [(); L_3 * 1]:,
+{
     pub l_1: LinearLayer<i32, L_1, L_2>,
     pub r_1: ReluLayer<i32, i8, L_2>,
     pub l_2: LinearLayer<i32, L_2, L_3>,
@@ -11,7 +18,14 @@ pub struct Network<const L_1: usize, const L_2: usize, const L_3: usize> {
     pub l_3: LinearLayer<i32, L_3, 1>,
 }
 
-impl<const L_1: usize, const L_2: usize, const L_3: usize> Network<L_1, L_2, L_3> {
+impl<const L_1: usize, const L_2: usize, const L_3: usize> Network<L_1, L_2, L_3>
+where
+    [(); L_1 * L_2]:,
+
+    [(); L_2 * L_3]:,
+
+    [(); L_3 * 1]:,
+{
     pub fn load<R: Read>(&mut self, r: &mut R) {
         self.l_1.load(r);
 

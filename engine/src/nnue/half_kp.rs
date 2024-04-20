@@ -20,7 +20,12 @@ fn half_kp_index(king_sq: u32, piece_sq: u32, piece: Piece, prespective: PieceCo
 //Num squares * (num_square * (num_pieces without king) + 1)
 pub const HALFKP_FEATURES: usize = 64 * (10 * 64 + 1);
 
-pub struct HalfKP<const OUT: usize, const L_1_IN: usize, const L_2_IN: usize> {
+pub struct HalfKP<const OUT: usize, const L_1_IN: usize, const L_2_IN: usize>
+where
+    [(); OUT * L_1_IN]:,
+    [(); L_1_IN * L_2_IN]:,
+    [(); L_2_IN * 1]:,
+{
     pub r_0: ReluLayer<i16, i8, OUT>,
     pub network: Network<OUT, L_1_IN, L_2_IN>,
     pub network_buffer: LayersBuffer<OUT, L_1_IN, L_2_IN>,
@@ -31,6 +36,10 @@ pub struct HalfKP<const OUT: usize, const L_1_IN: usize, const L_2_IN: usize> {
 impl<const OUT: usize, const L_1_IN: usize, const L_2_IN: usize> HalfKP<OUT, L_1_IN, L_2_IN>
 where
     [(); OUT / 2]:,
+
+    [(); OUT * L_1_IN]:,
+    [(); L_1_IN * L_2_IN]:,
+    [(); L_2_IN * 1]:,
 {
     pub fn new_boxed() -> Box<Self> {
         unsafe { Box::from_raw(std::alloc::alloc(std::alloc::Layout::new::<Self>()) as *mut Self) }

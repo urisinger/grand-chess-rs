@@ -1,25 +1,31 @@
+use core::slice;
 use std::io::Read;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
 use super::Layer;
 
-pub struct LinearLayer<BT, const I: usize, const O: usize> {
+pub struct LinearLayer<BT, const I: usize, const O: usize>
+where
+    [(); I * O]:,
+{
     pub bias: [BT; O],
-    pub weights: [[i8; O]; I],
+    pub weights: [i8; I * O],
 }
 
-impl<const I: usize, const O: usize> Layer<i8, i32, I, O> for LinearLayer<i32, I, O> {
+impl<const I: usize, const O: usize> Layer<i8, i32, I, O> for LinearLayer<i32, I, O>
+where
+    [(); I * O]:,
+{
     fn load<R: Read>(&mut self, r: &mut R) {
         for i in 0..O {
             self.bias[i] = r.read_i32::<LittleEndian>().unwrap();
         }
 
-        for i in 0..I {
-            for j in 0..O {
-                self.weights[i][j] = r.read_i8().unwrap();
-            }
-        }
+        r.read_exact(unsafe {
+            slice::from_raw_parts_mut(self.weights.as_mut_ptr() as *mut i8 as *mut u8, O * I)
+        })
+        .unwrap();
     }
 
     fn get_hash(prev_hash: u32) -> u32 {
@@ -32,18 +38,15 @@ impl<const I: usize, const O: usize> Layer<i8, i32, I, O> for LinearLayer<i32, I
 
     fn propagate(&self, input: &[i8; I], output: &mut [i32; O]) {
         for i in 0..O {
-            output[i] = self.bias[i];
-        }
-
-        for i in 0..O {
-            let mut sum = 0;
+            let mut sum = self.bias[i];
             for j in 0..I {
-                sum += (input[j] as i32 * self.weights[j][i] as i32) as i32;
+                sum += input[j] as i32 * self.weights[i * I + j] as i32;
+                if i * I + j < 32 {
+                    println!("{}, {}", input[j] as i32, self.weights[i * I + j] as i32);
+                }
             }
 
-            output[i] += sum;
+            output[i] = sum;
         }
-
-        println!("");
     }
 }
