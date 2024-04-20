@@ -32,7 +32,7 @@ mod tests {
             relu.propagate(&input, &mut output);
 
             for i in 0..32 {
-                assert_eq!(input[i].clamp(0, 127) as i8, output[i]);
+                assert_eq!((input[i] >> 6).clamp(0, 127) as i8, output[i]);
             }
         }
     }

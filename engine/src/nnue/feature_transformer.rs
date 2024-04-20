@@ -53,7 +53,7 @@ where
         for i in 0..OUT {
             output[i] = input[i].max(0).min(127) as i8;
 
-            print!("{} ", output[i]);
+            print!("{} ", input[i]);
         }
 
         println!("");

@@ -14,7 +14,9 @@ impl<const I: usize, const O: usize> Layer<i8, i32, I, O> for LinearLayer<i32, I
         for i in 0..O {
             self.bias[i] = r.read_i32::<LittleEndian>().unwrap();
 
-            println!("{}", self.bias[i]);
+            if O == 1 {
+                println!("{}", self.bias[i]);
+            }
         }
 
         for i in 0..I {

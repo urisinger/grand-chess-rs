@@ -14,7 +14,9 @@ use super::{
 };
 
 fn half_kp_index(king_sq: u32, piece_sq: u32, piece: Piece, prespective: PieceColor) -> usize {
-    (piece as usize * 64 + piece_sq as usize) + king_sq as usize * 640
+    (piece.get_type() as usize + 6 * (piece.get_color() == prespective) as usize) * 64
+        + piece_sq as usize
+        + king_sq as usize * 641
 }
 
 //Num squares * (num_square * (num_pieces without king) + 1)
@@ -96,7 +98,12 @@ where
             while pieces != 0 {
                 let sq = pieces.trailing_zeros();
 
-                features.push(half_kp_index(white_king_sq, sq, piece, PieceColor::White));
+                features.push(half_kp_index(
+                    white_king_sq,
+                    sq,
+                    piece.flip_color(),
+                    PieceColor::White,
+                ));
 
                 pieces &= pieces - 1;
             }
@@ -121,7 +128,7 @@ where
                 features.push(half_kp_index(
                     black_king_sq ^ 0x3F,
                     sq ^ 0x3F,
-                    piece.flip_color(),
+                    piece,
                     PieceColor::Black,
                 ));
 
