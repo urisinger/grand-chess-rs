@@ -52,11 +52,7 @@ where
                 .unwrap();
         for i in 0..OUT {
             output[i] = input[i].max(0).min(127) as i8;
-
-            print!("{} ", input[i]);
         }
-
-        println!("");
     }
 
     pub fn refresh(
