@@ -1,24 +1,27 @@
 use core::slice;
 use std::io::Read;
 
-use board::piece::{Piece, PieceColor};
+use board::{
+    piece::{Piece, PieceColor, PieceIter, PieceType},
+    Board,
+};
 use byteorder::{LittleEndian, ReadBytesExt};
 
 use super::{
     feature_transformer::{Accumulator, FeatureTransformer},
+    layers::{crelu::ReluLayer, Layer},
     network::{LayersBuffer, Network},
 };
 
 fn half_kp_index(king_sq: u32, piece_sq: u32, piece: Piece, prespective: PieceColor) -> usize {
-    let piece_idx =
-        if piece.get_color() == prespective { piece as usize | 1 } else { piece as usize & !1 };
-    piece_sq as usize + (piece_idx + king_sq as usize * 10) * 64
+    (piece as usize * 64 + piece_sq as usize) + king_sq as usize * 640
 }
 
 //Num squares * (num_square * (num_pieces without king) + 1)
 pub const HALFKP_FEATURES: usize = 64 * (10 * 64 + 1);
 
 pub struct HalfKP<const OUT: usize, const L_1_IN: usize, const L_2_IN: usize> {
+    pub r_0: ReluLayer<i16, i8, OUT>,
     pub network: Network<OUT, L_1_IN, L_2_IN>,
     pub network_buffer: LayersBuffer<OUT, L_1_IN, L_2_IN>,
 
@@ -75,15 +78,62 @@ where
             "Incorrect network hash! expected {}, found {}",
             hash, correct_hash
         );
+
         self.network.load(r);
+
+        println!("network loaded");
     }
 
-    pub fn eval(&mut self, accumulator: &Accumulator<i8, OUT>) -> i32 {
-        self.network.propagate(
-            unsafe { slice::from_raw_parts(accumulator.accumulators.as_ptr() as *const i8, OUT) }
-                .try_into()
-                .unwrap(),
-            &mut self.network_buffer,
-        )
+    pub fn refresh_acc(&self, accumulator: &mut Accumulator<i16, OUT>, board: &Board) {
+        let mut features = vec![];
+        let white_king_sq = board.bit_boards[Piece::WhiteKing].trailing_zeros();
+        for piece in PieceIter::new() {
+            if piece.get_type() == PieceType::King {
+                continue;
+            }
+            let mut pieces = board.bit_boards[piece];
+
+            while pieces != 0 {
+                let sq = pieces.trailing_zeros();
+
+                features.push(half_kp_index(white_king_sq, sq, piece, PieceColor::White));
+
+                pieces &= pieces - 1;
+            }
+        }
+
+        self.feature_transformer.refresh(accumulator, &features, PieceColor::White);
+
+        dbg!(&features);
+
+        features.clear();
+
+        let black_king_sq = board.bit_boards[Piece::BlackKing].trailing_zeros();
+        for piece in PieceIter::new() {
+            if piece.get_type() == PieceType::King {
+                continue;
+            }
+            let mut pieces = board.bit_boards[piece];
+
+            while pieces != 0 {
+                let sq = pieces.trailing_zeros();
+
+                features.push(half_kp_index(
+                    black_king_sq ^ 0x3F,
+                    sq ^ 0x3F,
+                    piece.flip_color(),
+                    PieceColor::Black,
+                ));
+
+                pieces &= pieces - 1;
+            }
+        }
+
+        self.feature_transformer.refresh(accumulator, &features, PieceColor::Black);
+    }
+
+    pub fn eval(&mut self, accumulator: &Accumulator<i16, OUT>) -> i32 {
+        self.feature_transformer.transform(accumulator, &mut self.network_buffer.r_0);
+        self.network.propagate(&mut self.network_buffer)
     }
 }

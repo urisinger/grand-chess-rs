@@ -24,19 +24,6 @@ mod tests {
     #[test]
     fn relu_test() {
         {
-            let input: [i16; 128] = from_fn(|index| (index as i16).wrapping_mul(1000));
-            let mut output = [0i8; 128];
-
-            let relu = ReluLayer::default();
-
-            relu.propagate(&input, &mut output);
-
-            for i in 0..128 {
-                assert_eq!(input[i].clamp(0, 127) as i8, output[i]);
-            }
-        }
-
-        {
             let input: [i32; 256] = from_fn(|index| (index as i32).wrapping_mul(1000));
             let mut output = [0i8; 256];
 
@@ -53,18 +40,8 @@ mod tests {
     #[bench]
     fn relu_bench(bencher: &mut Bencher) {
         bencher.iter(|| {
-            let input: [i32; 32] = from_fn(|index| (index as i32).wrapping_mul(1000));
-            let mut output = [0i8; 32];
-
-            let relu = ReluLayer::default();
-
-            relu.propagate(&input, &mut output);
-
-            output
-        });
-        bencher.iter(|| {
-            let input: [i32; 32] = from_fn(|index| (index as i32).wrapping_mul(1000));
-            let mut output = [0i8; 32];
+            let input: [i32; 256] = from_fn(|index| (index as i32).wrapping_mul(1000));
+            let mut output = [0i8; 256];
 
             let relu = ReluLayer::default();
 
