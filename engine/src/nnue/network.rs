@@ -26,7 +26,7 @@ where
 
     [(); L_3 * 1]:,
 {
-    pub fn load<R: Read>(&mut self, r: &mut R) {
+    pub fn load(&mut self, r: &mut impl Read) {
         self.l_1.load(r);
 
         self.l_2.load(r);
@@ -49,8 +49,8 @@ where
         hash
     }
 
-    pub fn propagate(&self, buffer: &mut LayersBuffer<L_1, L_2, L_3>) -> i32 {
-        self.l_1.propagate(&buffer.r_0, &mut buffer.l_1);
+    pub fn propagate(&self, input: &[i8; L_1], buffer: &mut LayersBuffer<L_1, L_2, L_3>) -> i32 {
+        self.l_1.propagate(&input, &mut buffer.l_1);
 
         self.r_1.propagate(&buffer.l_1, &mut buffer.r_1);
         self.l_2.propagate(&buffer.r_1, &mut buffer.l_2);
@@ -63,7 +63,6 @@ where
 
 #[repr(align(64))]
 pub struct LayersBuffer<const L_1: usize, const L_2: usize, const L_3: usize> {
-    pub r_0: [i8; L_1],
     pub l_1: [i32; L_2],
     pub r_1: [i8; L_2],
     pub l_2: [i32; L_3],

@@ -3,7 +3,6 @@ use std::ops::IndexMut;
 
 use super::piece::Piece;
 use super::piece::PieceColor;
-use super::piece::PieceIter;
 
 #[derive(Default, Debug, Clone)]
 pub struct BitBoards {
@@ -40,9 +39,10 @@ impl BitBoards {
     pub fn to_mailbox(&self) -> [Piece; 64] {
         let mut arr = [Piece::default(); 64];
 
-        for piece in PieceIter::new() {
-            let mut mask = self[piece];
+        for i in 0..Piece::Empty as usize {
+            let mut mask = self.pieces[i];
             while mask != 0 {
+                let piece = (i as u8).into();
                 let index = mask.trailing_zeros();
                 arr[index as usize] = piece;
 
@@ -64,8 +64,8 @@ impl BitBoards {
     pub fn clear_square(&mut self, square: usize) {
         self.occupancy[0] &= !(1u64 << square);
         self.occupancy[1] &= !(1u64 << square);
-        for piece in PieceIter::new() {
-            self[piece] &= !(1 << square);
+        for i in 0..Piece::Empty as usize {
+            self.pieces[i] &= !(1 << square);
         }
     }
 
@@ -76,9 +76,9 @@ impl BitBoards {
     }
 
     pub fn piece_at(&self, index: usize) -> Piece {
-        for piece in PieceIter::new() {
-            if (1 << index) & self[piece] != 0 {
-                return piece;
+        for i in 0..Piece::Empty as usize {
+            if (1 << index) & self.pieces[i] != 0 {
+                return (i as u8).into();
             }
         }
         Piece::Empty

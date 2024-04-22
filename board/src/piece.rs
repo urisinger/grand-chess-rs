@@ -1,4 +1,4 @@
-use std::{ops::Not, str::FromStr};
+use std::{io::Empty, ops::Not, str::FromStr};
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 #[repr(u8)]
@@ -149,38 +149,6 @@ impl Piece {
 impl From<u8> for Piece {
     fn from(value: u8) -> Self {
         unsafe { core::mem::transmute(value.clamp(0, 12)) }
-    }
-}
-
-#[derive(Default)]
-pub struct PieceIter {
-    cur: u8,
-}
-
-impl PieceIter {
-    pub fn new() -> Self {
-        PieceIter { cur: 0 }
-    }
-}
-
-impl Iterator for PieceIter {
-    type Item = Piece;
-
-    #[inline(always)]
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.cur == Piece::Empty as u8 {
-            return None;
-        }
-        let piece = Piece::from(self.cur);
-        self.cur += 1;
-        Some(piece)
-    }
-
-    #[inline(always)]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let size = Piece::Empty as usize;
-
-        (size, Some(size))
     }
 }
 

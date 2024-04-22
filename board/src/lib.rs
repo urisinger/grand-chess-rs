@@ -348,6 +348,7 @@ impl Board {
                 self.castle_flags &= !CastleFlags::BLACK_KINGSIDE_CASTLING;
             }
         }
+
         if piece == Piece::WhiteKing {
             self.castle_flags &=
                 !(CastleFlags::WHITE_KINGSIDE_CASTLING | CastleFlags::WHITE_QUEENSIDE_CASTLING);

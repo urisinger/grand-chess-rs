@@ -17,7 +17,7 @@ impl<const I: usize, const O: usize> Layer<i8, i32, I, O> for LinearLayer<i32, I
 where
     [(); I * O]:,
 {
-    fn load<R: Read>(&mut self, r: &mut R) {
+    fn load(&mut self, r: &mut impl Read) {
         for i in 0..O {
             self.bias[i] = r.read_i32::<LittleEndian>().unwrap();
         }
@@ -41,9 +41,6 @@ where
             let mut sum = self.bias[i];
             for j in 0..I {
                 sum += input[j] as i32 * self.weights[i * I + j] as i32;
-                if i * I + j < 32 {
-                    println!("{}, {}", input[j] as i32, self.weights[i * I + j] as i32);
-                }
             }
 
             output[i] = sum;

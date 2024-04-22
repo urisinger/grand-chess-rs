@@ -2,7 +2,7 @@ use core::slice;
 use std::io::Read;
 
 use board::{
-    piece::{Piece, PieceColor, PieceIter, PieceType},
+    piece::{Piece, PieceColor, PieceType},
     Board,
 };
 use byteorder::{LittleEndian, ReadBytesExt};
@@ -13,24 +13,31 @@ use super::{
     network::{LayersBuffer, Network},
 };
 
-fn half_kp_index(king_sq: u32, piece_sq: u32, piece: Piece, prespective: PieceColor) -> usize {
-    (piece as usize) * 64 + piece_sq as usize + 1 + king_sq as usize * 641
-}
-
 //Num squares * (num_square * (num_pieces without king) + 1)
 pub const HALFKP_FEATURES: usize = 64 * (10 * 64 + 1);
 
+fn half_kp_index(king_sq: u32, piece_sq: u32, piece: Piece, prespective: PieceColor) -> usize {
+    let flipped_sq = piece_sq as usize ^ (0x3F * prespective as usize);
+
+    let flipped_king = king_sq as usize ^ (0x3F * prespective as usize);
+
+    (((piece as usize >> 1) << 1) + (piece.get_color() != prespective) as usize) * 64
+        + flipped_sq
+        + 1
+        + flipped_king * 641
+}
+
 pub struct HalfKP<const OUT: usize, const L_1_IN: usize, const L_2_IN: usize>
 where
+    [(); OUT / 2]:,
     [(); OUT * L_1_IN]:,
     [(); L_1_IN * L_2_IN]:,
     [(); L_2_IN * 1]:,
 {
-    pub r_0: ReluLayer<i16, i8, OUT>,
     pub network: Network<OUT, L_1_IN, L_2_IN>,
-    pub network_buffer: LayersBuffer<OUT, L_1_IN, L_2_IN>,
 
     pub feature_transformer: FeatureTransformer<i16, i16, HALFKP_FEATURES, OUT>,
+    pub network_buffer: LayersBuffer<OUT, L_1_IN, L_2_IN>,
 }
 
 impl<const OUT: usize, const L_1_IN: usize, const L_2_IN: usize> HalfKP<OUT, L_1_IN, L_2_IN>
@@ -93,7 +100,7 @@ where
         println!("network loaded");
     }
 
-    pub fn refresh_acc(&self, accumulator: &mut Accumulator<i16, OUT>, board: &Board) {
+    pub fn refresh(&self, accumulator: &mut Accumulator<i16, OUT>, board: &Board) {
         let mut features = vec![];
         let white_king_sq = board.bit_boards[Piece::WhiteKing].trailing_zeros();
         for piece in PieceIter::new() {
@@ -113,9 +120,6 @@ where
 
         self.feature_transformer.refresh(accumulator, &features, PieceColor::White);
 
-        features.sort();
-        dbg!(&features);
-
         features.clear();
 
         let black_king_sq = board.bit_boards[Piece::BlackKing].trailing_zeros();
@@ -128,25 +132,18 @@ where
             while pieces != 0 {
                 let sq = pieces.trailing_zeros();
 
-                features.push(half_kp_index(
-                    black_king_sq ^ 0x3F,
-                    sq ^ 0x3F,
-                    piece.flip_color(),
-                    PieceColor::Black,
-                ));
+                features.push(half_kp_index(black_king_sq, sq, piece, PieceColor::Black));
 
                 pieces &= pieces - 1;
             }
         }
 
-        features.sort();
-        dbg!(&features);
-
         self.feature_transformer.refresh(accumulator, &features, PieceColor::Black);
     }
 
-    pub fn eval(&mut self, accumulator: &Accumulator<i16, OUT>) -> i32 {
-        self.feature_transformer.transform(accumulator, &mut self.network_buffer.r_0);
-        self.network.propagate(&mut self.network_buffer)
+    pub fn eval(&mut self, accumulator: &Accumulator<i16, OUT>, prespective: PieceColor) -> i32 {
+        let mut input = [0; OUT];
+        self.feature_transformer.transform(accumulator, &mut input, prespective);
+        self.network.propagate(&input, &mut self.network_buffer)
     }
 }
