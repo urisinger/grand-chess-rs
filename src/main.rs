@@ -1,30 +1,30 @@
 #![allow(dead_code)]
-
 use std::{
     fs::File,
     io::{self, BufReader},
 };
 
-use board::{piece::PieceColor, Board};
 use engine::{
-    nnue::{feature_transformer::Accumulator, half_kp::HalfKP},
+    board::{piece::PieceColor, Board},
+    nnue::{half_kp::HalfKP, network::TripleLayerNetwork, Nnue},
     GrandChessEngine,
 };
 use uci::UciConnection;
 
 pub fn main() {
-    let mut net: Box<HalfKP<512, 32, 32>> = HalfKP::load_boxed(&mut BufReader::new(
-        File::open("/home/uri_singer/Downloads/nn-97f742aaefcd.nnue").unwrap(),
-    ));
+    let mut net = Nnue::<TripleLayerNetwork<512, 32, 32>, HalfKP, 128, 512>::new_boxed(
+        &mut BufReader::new(File::open("/home/uri_singer/Downloads/nn-62ef826d1a6d.nnue").unwrap()),
+    );
 
-    let mut acc = Accumulator::new_boxed();
+    let board =
+        Board::from_fen("r1bqk2r/pppnbpp1/4pn1p/3p4/Q1P5/3P2PP/PP2PPB1/RNB1K1NR w KQkq - 2 7")
+            .unwrap();
 
-    net.refresh(&mut acc, &Board::from_fen("2r1k2r/8/8/8/8/8/8/4K3 b Kkq - 0 1").unwrap());
-    println!("{}", Board::from_fen("2r1k2r/8/8/8/8/8/8/4K3 b Kkq - 0 1").unwrap());
+    net.refresh_board(&board);
 
-    println!("white eval: {}", net.eval(&acc, PieceColor::White));
+    println!("{}", board);
 
-    println!("black eval: {}", net.eval(&acc, PieceColor::Black));
+    dbg!(net.eval(0, board.current_color));
 
     let connection = UciConnection::new(
         BufReader::new(io::stdin()),

@@ -1,17 +1,17 @@
-use std::{io::Read, slice};
+use std::{
+    arch::x86_64::{
+        _mm256_loadu_si256, _mm256_max_epi8, _mm256_packs_epi16, _mm256_permute4x64_epi64,
+        _mm256_setzero_si256, _mm256_store_si256, _mm256_storeu_si256,
+    },
+    io::Read,
+};
 
-use board::piece::PieceColor;
+use crate::board::piece::PieceColor;
 use byteorder::{LittleEndian, ReadBytesExt};
 
 #[repr(align(64))]
 pub struct Accumulator<T, const OUT: usize> {
     pub accumulators: [T; OUT],
-}
-
-impl<T, const OUT: usize> Accumulator<T, OUT> {
-    pub fn new_boxed() -> Box<Self> {
-        unsafe { Box::from_raw(std::alloc::alloc(std::alloc::Layout::new::<Self>()) as *mut Self) }
-    }
 }
 
 pub struct FeatureTransformer<WT, BT, const IN: usize, const OUT: usize>
@@ -38,10 +38,6 @@ where
         }
     }
 
-    pub const fn get_hash() -> u32 {
-        OUT as u32
-    }
-
     pub fn transform(
         &self,
         acc: &Accumulator<i16, OUT>,
@@ -52,17 +48,43 @@ where
         for c in 0..=1 {
             let offset = if prespectives[c] == PieceColor::White { 0 } else { 1 } * OUT / 2;
 
-            for i in 0..OUT / 2 {
-                output[c * OUT / 2 + i] = acc.accumulators[offset + i].clamp(0, 127) as i8;
+            const IN_REGISTER_WIDTH: usize = 256 / 16;
+            const OUT_REGISTER_WIDTH: usize = 256 / 8;
+            assert!(OUT % OUT_REGISTER_WIDTH == 0, "We're processing 32 elements at a time");
+            let num_of_chunks: usize = (OUT / 2) / OUT_REGISTER_WIDTH;
+
+            let zero = unsafe { _mm256_setzero_si256() };
+            const CONTROL: i32 = 0b11011000;
+
+            for i in 0..num_of_chunks {
+                unsafe {
+                    let in0 = _mm256_loadu_si256(
+                        &acc.accumulators[offset + (i * 2 + 0) * IN_REGISTER_WIDTH] as *const i16
+                            as *const _,
+                    );
+                    let in1 = _mm256_loadu_si256(
+                        &acc.accumulators[offset + (i * 2 + 1) * IN_REGISTER_WIDTH] as *const i16
+                            as *const _,
+                    );
+
+                    let result = _mm256_permute4x64_epi64(
+                        _mm256_max_epi8(_mm256_packs_epi16(in0, in1), zero),
+                        CONTROL,
+                    );
+
+                    _mm256_storeu_si256(
+                        &mut output[c * OUT / 2 + i * OUT_REGISTER_WIDTH] as *mut i8 as *mut _,
+                        result,
+                    );
+                }
             }
         }
-        println!("");
     }
 
     pub fn refresh(
         &self,
         acc: &mut Accumulator<i16, OUT>,
-        features: &Vec<usize>,
+        features: &[usize],
         perspective: PieceColor,
     ) {
         let offset = if perspective == PieceColor::White { 0 } else { 1 } * OUT / 2;
@@ -71,7 +93,7 @@ where
             acc.accumulators[offset + i] = self.bias[i];
         }
 
-        for feature in features {
+        for feature in features.iter() {
             for i in 0..OUT / 2 {
                 acc.accumulators[offset + i] += self.weights[*feature][i];
             }
@@ -82,8 +104,8 @@ where
         &mut self,
         acc: &mut Accumulator<i16, OUT>,
         prev_acc: &Accumulator<i16, OUT>,
-        added_features: &Vec<usize>,
-        removed_features: &Vec<usize>,
+        added_features: &[usize],
+        removed_features: &[usize],
         prespective: PieceColor,
     ) {
         let offset = prespective as usize * OUT / 2;

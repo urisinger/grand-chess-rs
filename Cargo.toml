@@ -1,5 +1,5 @@
 [workspace]
-members = ["board", "engine", "uci"]
+members = ["engine", "uci"]
 
 [package]
 name = "grand_chess_rs"
@@ -9,7 +9,6 @@ edition = "2021"
 [dependencies]
 engine = {path = "engine/"} 
 uci = {path = "uci/"}
-board = {path = "board/"}
 
 [profile.dev]
 opt-level = 2

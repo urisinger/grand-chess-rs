@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-board = {path = "../board/"}
 byteorder = "1.5.0"
 uci = {path = "../uci/"}
+static_init = "1.0.3"
+bitflags = "2.5.0"
+rand = "0.8.5"
+rayon = "1.10.0"

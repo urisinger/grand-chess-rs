@@ -8,7 +8,7 @@ use uci::{
     Duration, UciInfoAttribute, UciMove, UciPiece, UciSearchControl, UciSquare, UciTimeControl,
 };
 
-use board::{
+use crate::board::{
     piece::{Piece, PieceColor, PieceType},
     r#move::{Move, MoveType},
     Board,
@@ -27,6 +27,8 @@ impl Engine for GrandChessEngine {
         time_control: Option<UciTimeControl>,
         search_control: Option<UciSearchControl>,
     ) {
+        self.nnue.refresh_board(&self.board);
+
         let mut best_move = UciMove::from_to(UciSquare::from('a', 1), UciSquare::from('a', 1));
 
         let depth = search_control.map(|s| s.depth.map(|d| d as u32)).flatten().unwrap_or(1000);

@@ -1,4 +1,4 @@
-use board::r#move::Move;
+use crate::board::r#move::Move;
 
 use super::MATE_SCORE;
 
