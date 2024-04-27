@@ -1,7 +1,7 @@
 use std::{
     arch::x86_64::{
         _mm256_loadu_si256, _mm256_max_epi8, _mm256_packs_epi16, _mm256_permute4x64_epi64,
-        _mm256_setzero_si256, _mm256_store_si256, _mm256_storeu_si256,
+        _mm256_setzero_si256, _mm256_storeu_si256,
     },
     io::Read,
 };

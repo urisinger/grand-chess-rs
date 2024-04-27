@@ -5,7 +5,10 @@ pub mod nnue;
 mod transposition;
 pub mod uci;
 
-use std::{fs::File, io::BufReader, sync::mpsc::Receiver, time::Instant};
+static NET: &[u8] = include_bytes!(env!("EVALFILE"));
+
+use std::{sync::mpsc::Receiver, time::Instant};
+
 
 use board::{
     movegen::{generate_captures, generate_moves},
@@ -65,9 +68,7 @@ impl GrandChessEngine {
             history_moves: [[0; 64]; 12],
             repetition_table: [0; MAX_PLY],
             board: Board::default(),
-            nnue: Nnue::new_boxed(&mut BufReader::new(
-                File::open("/home/uri_singer/Downloads/nn-62ef826d1a6d.nnue").unwrap(),
-            )),
+            nnue: Nnue::new_boxed(&mut std::io::Cursor::new(NET)),
             stop: false,
         }
     }

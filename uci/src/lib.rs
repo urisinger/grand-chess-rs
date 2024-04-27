@@ -19,6 +19,14 @@ pub trait Engine {
         search_control: Option<UciSearchControl>,
     );
 
+    fn hash_option() -> (u32, u32, u32) {
+        (1, 1, 1)
+    }
+
+    fn thread_option() -> (u32, u32, u32) {
+        (1, 1, 1)
+    }
+
     fn new_game(&mut self);
 
     fn set_pos(&mut self, fen: &str, moves: Vec<UciMove>);

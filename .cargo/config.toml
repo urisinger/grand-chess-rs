@@ -2,3 +2,6 @@
 rustflags = [
   "-Ctarget-cpu=native",
 ]
+
+[env]
+EVALFILE="nn-62ef826d1a6d.nnue"

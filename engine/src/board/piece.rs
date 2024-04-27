@@ -1,4 +1,4 @@
-use std::{io::Empty, ops::Not, str::FromStr};
+use std::{ops::Not, str::FromStr};
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 #[repr(u8)]

@@ -5,7 +5,7 @@ use std::{
 };
 
 use engine::{
-    board::{piece::PieceColor, Board},
+    board::{Board},
     nnue::{half_kp::HalfKP, network::TripleLayerNetwork, Nnue},
     GrandChessEngine,
 };
