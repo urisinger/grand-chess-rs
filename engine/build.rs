@@ -17,15 +17,13 @@ fn main() {
     let net_path = net_dir.join(std::env::var("EVALFILE").unwrap());
     if !net_path.exists() {
         let resp = reqwest::blocking::get(
-            Url::from_str("https://tests.stockfishchess.org/api/nn/")
+            Url::from_str("https://data.stockfishchess.org/nn/")
                 .unwrap()
                 .join(&std::env::var("EVALFILE").unwrap())
                 .unwrap(),
         )
-        .expect("request failed");
-        let body = resp.bytes().expect("body invalid");
-        let mut out = fs::File::create(&net_path).expect("failed to create file");
-        io::copy(&mut io::Cursor::new(body), &mut out).expect("failed to copy content");
+        .expect("request failed")
+        .copy_to(&mut fs::File::create(&net_path).expect("failed to create file"));
     }
     println!("cargo::rustc-env=EVALFILE={}", net_path.to_str().unwrap());
 }

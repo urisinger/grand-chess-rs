@@ -128,7 +128,7 @@ impl Move {
 
 #[cfg(test)]
 mod tests {
-    use crate::{r#move::Move, Piece, PieceType};
+    use crate::board::{r#move::Move, Piece, PieceType};
 
     use super::MoveType;
 

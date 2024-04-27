@@ -632,7 +632,7 @@ mod tests {
         PieceColor,
     };
 
-    use super::{Board, PieceDelta, PiecesDelta};
+    use super::{Board};
 
     #[test]
     fn perft_test() {

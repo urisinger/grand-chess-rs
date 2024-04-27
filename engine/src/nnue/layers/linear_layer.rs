@@ -1,5 +1,5 @@
 use core::slice;
-use std::io::Read;
+use std::{arch::x86_64::_mm256_dpbusd_epi32, io::Read};
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
