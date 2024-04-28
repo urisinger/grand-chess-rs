@@ -9,7 +9,6 @@ static NET: &[u8] = include_bytes!(env!("EVALFILE"));
 
 use std::{sync::mpsc::Receiver, time::Instant};
 
-
 use board::{
     movegen::{generate_captures, generate_moves},
     piece::{PieceColor, PieceType},
@@ -53,15 +52,17 @@ pub struct GrandChessEngine {
     nnue: Box<Nnue<TripleLayerNetwork<512, 32, 32>, HalfKP, MAX_PLY, 512>>,
 
     stop: bool,
+
+    dont_stop: bool,
 }
 
 impl GrandChessEngine {
-    pub fn new(size: usize) -> Self {
+    pub fn new(tt_bytes: usize) -> Self {
         Self {
             node_count: 0,
             max_time: None,
             ply_offset: 0,
-            tt: TTable::new(size),
+            tt: TTable::new(tt_bytes),
             pv_length: [0; MAX_PLY],
             pv_table: [[Move::null(); MAX_PLY]; MAX_PLY],
             killer_moves: [[Move::null(); MAX_PLY]; 2],
@@ -70,35 +71,13 @@ impl GrandChessEngine {
             board: Board::default(),
             nnue: Nnue::new_boxed(&mut std::io::Cursor::new(NET)),
             stop: false,
+            dont_stop: false,
         }
     }
 
     pub fn quiescence(&mut self, ply: usize, board: &Board, mut alpha: i32, beta: i32) -> i32 {
-        let mut best_move = Move::null();
-        let entry = self.tt.probe_entry(board.hash, ply as u32);
-        let stand_pat = if let Some(entry) = entry {
-            best_move = entry.best_move;
-
-            match entry.flags {
-                HashFlags::Exsact => return entry.score,
-                HashFlags::Alpha => {
-                    if entry.score <= alpha {
-                        return alpha;
-                    } else {
-                        entry.score
-                    }
-                }
-                HashFlags::Beta => {
-                    if entry.score >= beta {
-                        return beta;
-                    } else {
-                        entry.score
-                    }
-                }
-            }
-        } else {
-            self.nnue.eval(ply, board.current_color)
-        };
+        let best_move = Move::null();
+        let stand_pat = (self.nnue.eval(ply, board.current_color) + board.eval()) / 2;
 
         if stand_pat >= beta {
             return beta;
@@ -133,6 +112,7 @@ impl GrandChessEngine {
                 if new_board.is_square_attacked(castle_target, new_board.current_color) {
                     break;
                 }
+
                 if board.is_king_attacked(board.current_color) {
                     break;
                 }
@@ -183,8 +163,9 @@ impl GrandChessEngine {
         }
 
         if self.node_count % 2048 == 0 {
-            if (self.max_time.is_some() && Instant::now() > self.max_time.unwrap())
-                || reciver.try_recv().is_ok()
+            if ((self.max_time.is_some() && Instant::now() > self.max_time.unwrap())
+                || reciver.try_recv().is_ok())
+                && !self.dont_stop
             {
                 self.stop = true;
                 return STOPPED;
@@ -196,7 +177,7 @@ impl GrandChessEngine {
         let mut best_move = Move::null();
 
         let entry = self.tt.probe_entry(board.hash, ply as u32);
-        let mut guessed_score = if let Some(entry) = entry {
+        if let Some(entry) = entry {
             best_move = entry.best_move;
 
             if entry.depth >= depth && !is_pv {
@@ -205,48 +186,25 @@ impl GrandChessEngine {
                     HashFlags::Alpha => {
                         if entry.score <= alpha {
                             return alpha;
-                        } else {
-                            entry.score
                         }
                     }
                     HashFlags::Beta => {
                         if entry.score >= beta {
                             return beta;
-                        } else {
-                            entry.score
                         }
                     }
                 }
-            } else {
-                if entry.flags == HashFlags::Exsact {
-                    entry.score
-                } else {
-                    self.nnue.eval(ply, board.current_color)
-                }
             }
-        } else {
-            self.nnue.eval(ply, board.current_color)
         };
 
         if !in_check && ply != 0 && !is_pv {
-            if depth <= 5 && guessed_score - (depth * depth * 20) >= beta {
-                return guessed_score;
-            }
-
             let mut null_board = board.clone();
 
             null_board.make_null_move();
-
             const R: i32 = 2;
 
-            let null_score = -self.neg_max(
-                depth - 1 - R,
-                ply + 1 as usize,
-                &null_board,
-                -beta,
-                -beta + 1,
-                reciver,
-            );
+            let null_score =
+                -self.neg_max(depth - 1 - R, ply, &null_board, -beta, -beta + 1, reciver);
 
             if null_score >= beta {
                 return beta;
@@ -275,18 +233,6 @@ impl GrandChessEngine {
 
             self.nnue.make_move(moves[i], &mut new_board, ply);
 
-            const FMAGRIN: [i32; 4] = [0, 200, 300, 700];
-            if !in_check
-                && !is_pv
-                && moves_searched != 0
-                && depth <= 3
-                && moves[i].move_type() < MoveType::EnPassantCapture
-                && new_board.eval() + FMAGRIN[depth as usize] <= alpha
-                && !new_board.is_king_attacked(!board.current_color)
-            {
-                continue;
-            }
-
             if new_board.is_king_attacked(board.current_color) {
                 continue;
             }
@@ -309,7 +255,7 @@ impl GrandChessEngine {
                 }
             }
 
-            guessed_score = if moves_searched == 0 {
+            let score = if moves_searched == 0 {
                 self.repetition_table[ply + 1] = new_board.hash;
                 -self.neg_max(depth - 1, ply + 1, &new_board, -beta, -alpha, reciver)
             } else {
@@ -318,8 +264,8 @@ impl GrandChessEngine {
                     && !in_check
                     && moves[i].move_type() < MoveType::EnPassantCapture
                 {
-                    self.repetition_table[ply + 2] = new_board.hash;
-                    -self.neg_max(depth - 2, ply + 2, &new_board, -alpha - 1, -alpha, reciver)
+                    self.repetition_table[ply + 1] = new_board.hash;
+                    -self.neg_max(depth - 2, ply + 1, &new_board, -alpha - 1, -alpha, reciver)
                 } else {
                     alpha + 1
                 };
@@ -339,8 +285,8 @@ impl GrandChessEngine {
                 return STOPPED;
             }
 
-            if guessed_score > alpha && !self.stop {
-                alpha = guessed_score;
+            if score > alpha && !self.stop {
+                alpha = score;
                 best_move = moves[i];
                 hash_flag = HashFlags::Exsact;
 
@@ -358,9 +304,9 @@ impl GrandChessEngine {
                 self.pv_length[ply] = self.pv_length[ply + 1];
             }
 
-            if guessed_score >= beta {
+            if score >= beta {
                 self.tt.write_entry(
-                    THash::new(board.hash, depth, guessed_score, best_move, HashFlags::Beta),
+                    THash::new(board.hash, depth, score, best_move, HashFlags::Beta),
                     ply as u32,
                 );
                 if moves[i].captured() != PieceType::Empty {
@@ -372,17 +318,6 @@ impl GrandChessEngine {
         }
 
         if moves_searched == 0 {
-            self.tt.write_entry(
-                THash::new(
-                    board.hash,
-                    depth,
-                    in_check as i32 * -(MATE_VALUE + depth as i32),
-                    best_move,
-                    HashFlags::Exsact,
-                ),
-                ply as u32,
-            );
-
             return in_check as i32 * -(MATE_VALUE + depth as i32);
         } else {
             self.tt.write_entry(

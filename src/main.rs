@@ -1,15 +1,25 @@
 #![allow(dead_code)]
-use std::io::{self, BufReader};
+use std::{
+    env,
+    io::{self, BufReader},
+};
 
 use engine::GrandChessEngine;
 use uci::UciConnection;
 
 pub fn main() {
-    let connection = UciConnection::new(
-        BufReader::new(io::stdin()),
-        io::stdout(),
-        GrandChessEngine::new(10000000),
-    );
+    let mut args = env::args();
 
-    connection.run();
+    args.next();
+    if let Some("bench") = args.next().as_deref() {
+        println!("benching!");
+    } else {
+        let connection = UciConnection::new(
+            BufReader::new(io::stdin()),
+            io::stdout(),
+            GrandChessEngine::new(100000000),
+        );
+
+        connection.run();
+    }
 }

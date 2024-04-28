@@ -27,7 +27,7 @@ impl Engine for GrandChessEngine {
         time_control: Option<UciTimeControl>,
         search_control: Option<UciSearchControl>,
     ) {
-        self.nnue.refresh_board(&self.board);
+        self.nnue.refresh_board(&self.board, 0);
 
         let mut best_move = UciMove::from_to(UciSquare::from('a', 1), UciSquare::from('a', 1));
 
@@ -41,7 +41,11 @@ impl Engine for GrandChessEngine {
                 );
             }
             UciTimeControl::TimeLeft { white_time, black_time, moves_to_go, .. } => {
-                let moves_to_go = moves_to_go.unwrap_or(50) as i32;
+                let moves_to_go = if moves_to_go.unwrap_or(50) == 0 {
+                    1
+                } else {
+                    moves_to_go.unwrap_or(50) as i32
+                };
 
                 self.max_time =
                     match self.board.current_color {
@@ -59,6 +63,8 @@ impl Engine for GrandChessEngine {
         let mut beta = MAX_SCORE;
 
         let mut d = 1;
+
+        self.dont_stop = true;
         while d <= depth {
             self.node_count = 0;
 
@@ -66,6 +72,8 @@ impl Engine for GrandChessEngine {
             let score = self.neg_max(d as i32, 0, &self.board.clone(), alpha, beta, reciver);
 
             let time = start.elapsed();
+
+            self.dont_stop = false;
 
             if self.stop {
                 break;

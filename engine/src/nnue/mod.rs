@@ -149,14 +149,21 @@ where
         println!("network loaded");
     }
 
-    pub fn refresh_board(&mut self, board: &Board) {
+    pub fn refresh_board(&mut self, board: &Board, ply: usize) {
         let mut features = FeatureList::new();
         SET::active_features(&mut features, board, PieceColor::White);
-        self.transformer.refresh(&mut self.acc_stack[0], &features, PieceColor::White);
+        self.transformer.refresh(&mut self.acc_stack[ply], &features, PieceColor::White);
 
         let mut features = FeatureList::new();
         SET::active_features(&mut features, board, PieceColor::Black);
-        self.transformer.refresh(&mut self.acc_stack[0], &features, PieceColor::Black);
+        self.transformer.refresh(&mut self.acc_stack[ply], &features, PieceColor::Black);
+    }
+
+    pub fn make_null_move(&mut self, board: &mut Board, ply: usize) {
+        board.make_null_move();
+
+        let split = self.acc_stack.split_at_mut(ply + 1);
+        split.1[0].accumulators.copy_from_slice(&split.0[ply].accumulators);
     }
 
     pub fn make_move(&mut self, r#move: Move, board: &mut Board, ply: usize) {
@@ -222,6 +229,8 @@ where
         let mut input = [0; NET_IN];
         self.transformer.transform(&self.acc_stack[ply], &mut input, side);
 
-        self.net.eval(&input, &mut self.net_buffer)
+        let eval = self.net.eval(&input, &mut self.net_buffer);
+
+        eval
     }
 }

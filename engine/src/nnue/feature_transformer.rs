@@ -1,7 +1,7 @@
 use std::{
     arch::x86_64::{
-        _mm256_loadu_si256, _mm256_max_epi8, _mm256_packs_epi16, _mm256_permute4x64_epi64,
-        _mm256_setzero_si256, _mm256_storeu_si256,
+        _mm256_add_epi16, _mm256_loadu_si256, _mm256_max_epi8, _mm256_packs_epi16,
+        _mm256_permute4x64_epi64, _mm256_setzero_si256, _mm256_storeu_si256, _mm256_sub_epi16,
     },
     io::Read,
 };
@@ -87,15 +87,50 @@ where
         features: &[usize],
         perspective: PieceColor,
     ) {
+        const REGISTER_WIDTH: usize = 256 / 16;
         let offset = if perspective == PieceColor::White { 0 } else { 1 } * OUT / 2;
 
-        for i in 0..OUT / 2 {
-            acc.accumulators[offset + i] = self.bias[i];
-        }
+        const NUM_REGISTERS: usize = 16;
 
-        for feature in features.iter() {
-            for i in 0..OUT / 2 {
-                acc.accumulators[offset + i] += self.weights[*feature][i];
+        let num_chunks = OUT / (2 * NUM_REGISTERS * REGISTER_WIDTH);
+
+        let zero = unsafe { _mm256_setzero_si256() };
+        let mut regs = [zero; NUM_REGISTERS];
+
+        for i in 0..num_chunks {
+            for j in 0..NUM_REGISTERS {
+                unsafe {
+                    regs[j] = _mm256_loadu_si256(
+                        &self.bias[NUM_REGISTERS * REGISTER_WIDTH * i + j * REGISTER_WIDTH]
+                            as *const i16 as *const _,
+                    );
+                }
+            }
+
+            for feature in features.iter() {
+                for j in 0..NUM_REGISTERS {
+                    regs[j] = unsafe {
+                        _mm256_add_epi16(
+                            regs[j],
+                            _mm256_loadu_si256(
+                                &self.weights[*feature]
+                                    [NUM_REGISTERS * REGISTER_WIDTH * i + j * REGISTER_WIDTH]
+                                    as *const i16 as *const _,
+                            ),
+                        )
+                    };
+                }
+            }
+
+            for j in 0..NUM_REGISTERS {
+                unsafe {
+                    _mm256_storeu_si256(
+                        &mut acc.accumulators
+                            [offset + i * NUM_REGISTERS * REGISTER_WIDTH + j * REGISTER_WIDTH]
+                            as *mut i16 as *mut _,
+                        regs[j],
+                    );
+                }
             }
         }
     }
@@ -108,19 +143,86 @@ where
         removed_features: &[usize],
         prespective: PieceColor,
     ) {
-        let offset = prespective as usize * OUT / 2;
-        acc.accumulators[offset..offset + OUT / 2]
-            .copy_from_slice(&prev_acc.accumulators[offset..offset + OUT / 2]);
+        if cfg!(target_arch = "x86_64") {
+            const REGISTER_WIDTH: usize = 256 / 16;
+            let offset = if prespective == PieceColor::White { 0 } else { 1 } * OUT / 2;
 
-        for r in removed_features {
-            for i in 0..OUT / 2 {
-                acc.accumulators[offset + i] -= self.weights[*r][i];
+            const NUM_REGISTERS: usize = 16;
+
+            let num_chunks = OUT / (2 * NUM_REGISTERS * REGISTER_WIDTH);
+
+            let zero = unsafe { _mm256_setzero_si256() };
+            let mut regs = [zero; NUM_REGISTERS];
+
+            for i in 0..num_chunks {
+                for j in 0..NUM_REGISTERS {
+                    unsafe {
+                        regs[j] = _mm256_loadu_si256(
+                            &prev_acc.accumulators
+                                [offset + NUM_REGISTERS * REGISTER_WIDTH * i + j * REGISTER_WIDTH]
+                                as *const i16 as *const _,
+                        );
+                    }
+                }
+
+                for feature in added_features {
+                    for j in 0..NUM_REGISTERS {
+                        regs[j] = unsafe {
+                            _mm256_add_epi16(
+                                regs[j],
+                                _mm256_loadu_si256(
+                                    &self.weights[*feature]
+                                        [NUM_REGISTERS * REGISTER_WIDTH * i + j * REGISTER_WIDTH]
+                                        as *const i16
+                                        as *const _,
+                                ),
+                            )
+                        };
+                    }
+                }
+
+                for feature in removed_features {
+                    for j in 0..NUM_REGISTERS {
+                        regs[j] = unsafe {
+                            _mm256_sub_epi16(
+                                regs[j],
+                                _mm256_loadu_si256(
+                                    &self.weights[*feature]
+                                        [NUM_REGISTERS * REGISTER_WIDTH * i + j * REGISTER_WIDTH]
+                                        as *const i16
+                                        as *const _,
+                                ),
+                            )
+                        };
+                    }
+                }
+
+                for j in 0..NUM_REGISTERS {
+                    unsafe {
+                        _mm256_storeu_si256(
+                            &mut acc.accumulators
+                                [offset + i * NUM_REGISTERS * REGISTER_WIDTH + j * REGISTER_WIDTH]
+                                as *mut i16 as *mut _,
+                            regs[j],
+                        );
+                    }
+                }
             }
-        }
+        } else {
+            let offset = prespective as usize * OUT / 2;
+            acc.accumulators[offset..offset + OUT / 2]
+                .copy_from_slice(&prev_acc.accumulators[offset..offset + OUT / 2]);
 
-        for a in added_features {
-            for i in 0..OUT / 2 {
-                acc.accumulators[offset + i] += self.weights[*a][i];
+            for r in removed_features {
+                for i in 0..OUT / 2 {
+                    acc.accumulators[offset + i] -= self.weights[*r][i];
+                }
+            }
+
+            for a in added_features {
+                for i in 0..OUT / 2 {
+                    acc.accumulators[offset + i] += self.weights[*a][i];
+                }
             }
         }
     }

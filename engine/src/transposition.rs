@@ -1,3 +1,5 @@
+use std::mem::size_of;
+
 use crate::board::r#move::Move;
 
 use super::MATE_SCORE;
@@ -31,15 +33,17 @@ pub struct TTable {
 
 impl TTable {
     pub fn new(size: usize) -> Self {
-        let mut entries = Vec::with_capacity(size);
-        entries.resize_with(size, Default::default);
+        let num_entries = size / size_of::<THash>();
+        let mut entries = Vec::with_capacity(num_entries);
+        entries.resize_with(num_entries, Default::default);
 
         Self { entries: entries.into() }
     }
 
     pub fn resize(&mut self, new_size: usize) {
-        let mut entries = Vec::with_capacity(new_size);
-        entries.resize(new_size, Default::default());
+        let num_entries = new_size / size_of::<THash>();
+        let mut entries = Vec::with_capacity(num_entries);
+        entries.resize(num_entries, Default::default());
 
         self.entries = entries.into();
     }

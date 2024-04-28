@@ -11,10 +11,19 @@ fn half_kp_index(king_sq: u32, piece_sq: u32, piece: Piece, prespective: PieceCo
 
     let flipped_king = king_sq as usize ^ (0x3F * prespective as usize);
 
-    (((piece as usize >> 1) << 1) + (piece.get_color() != prespective) as usize) * 64
+    let index = ((piece as usize / 2) * 2 + (piece.get_color() != prespective) as usize) * 64
         + flipped_sq
         + 1
-        + flipped_king * 641
+        + flipped_king * 641;
+
+    if index > 64 * (10 * 64 + 1) {
+        println!(
+            "king_sq: {}, piece_sq: {}, piece: {:?}, prespective: {:?}, index: {}",
+            flipped_king, flipped_sq, piece, prespective, index
+        );
+    };
+
+    index
 }
 
 pub struct HalfKP {}
@@ -54,6 +63,9 @@ impl FeatureSet for HalfKP {
     ) {
         let king_sq = board.bit_boards[Piece::new(PieceType::King, prespective)].trailing_zeros();
         for d in delta.into_iter() {
+            if d.piece.get_type() == PieceType::King {
+                continue;
+            }
             if d.to != 64 {
                 added_features.push(half_kp_index(king_sq, d.to, d.piece, prespective));
             }
