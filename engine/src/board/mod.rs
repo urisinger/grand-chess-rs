@@ -55,19 +55,13 @@ pub enum FenError {
     NoSuchColor(String),
     NoSuchCastle(char),
     EnPessentNotInRange(u32),
-    ParseIntError(ParseIntError),
+    InvalidEnPressant(String),
     NotEnoughInfo(),
 }
 
 impl From<NoSuchPieceError> for FenError {
     fn from(e: NoSuchPieceError) -> FenError {
         FenError::NoSuchPiece(e)
-    }
-}
-
-impl From<ParseIntError> for FenError {
-    fn from(e: ParseIntError) -> FenError {
-        FenError::ParseIntError(e)
     }
 }
 
@@ -204,8 +198,13 @@ impl Board {
             let word = words.next().ok_or(FenError::NotEnoughInfo())?;
 
             if word != "-" {
-                println!("{}", word);
-                match word.parse()? {
+                if word.len() < 2 {
+                    return Err(FenError::InvalidEnPressant(word.to_owned()));
+                }
+
+                let bytes = word.as_bytes();
+                let square = (bytes[0] - b'a' + 8 * (bytes[1] - b'1')) as u32;
+                match square {
                     n @ 0..=48 => {
                         hash ^= DOUBLE_PUSH_KEYS[n as usize];
                         Some(n)

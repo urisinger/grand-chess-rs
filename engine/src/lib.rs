@@ -75,7 +75,36 @@ impl GrandChessEngine {
         }
     }
 
-    pub fn quiescence(&mut self, ply: usize, board: &Board, mut alpha: i32, beta: i32) -> i32 {
+    pub fn bench(&mut self, benches: &[&str], depth: u32) {
+        let start_time = Instant::now();
+        self.node_count = 0;
+        for fen in benches {
+            for i in 1..depth {
+                self.neg_max(
+                    i as i32,
+                    0,
+                    &Board::from_fen(fen).unwrap(),
+                    MIN_SCORE,
+                    MAX_SCORE,
+                    None,
+                );
+            }
+
+            self.tt.clear();
+            self.pv_table.fill([Move::null(); 128]);
+            self.pv_length.fill(0);
+            self.history_moves.fill([0; 64]);
+            self.killer_moves.fill([Move::null(); MAX_PLY]);
+            self.repetition_table.fill(0);
+        }
+        println!(
+            "{} nodes {} nps",
+            self.node_count,
+            (self.node_count as f32 / start_time.elapsed().as_secs_f32()) as u64
+        );
+    }
+
+    fn quiescence(&mut self, ply: usize, board: &Board, mut alpha: i32, beta: i32) -> i32 {
         let best_move = Move::null();
         let stand_pat = (self.nnue.eval(ply, board.current_color) + board.eval()) / 2;
 
@@ -147,7 +176,7 @@ impl GrandChessEngine {
         board: &Board,
         mut alpha: i32,
         beta: i32,
-        reciver: &Receiver<()>,
+        reciver: Option<&Receiver<()>>,
     ) -> i32 {
         self.pv_length[ply] = ply;
 
@@ -164,7 +193,7 @@ impl GrandChessEngine {
 
         if self.node_count % 2048 == 0 {
             if ((self.max_time.is_some() && Instant::now() > self.max_time.unwrap())
-                || reciver.try_recv().is_ok())
+                || reciver.map(|recv| recv.try_recv().is_ok()).unwrap_or(false))
                 && !self.dont_stop
             {
                 self.stop = true;

@@ -1,11 +1,13 @@
 use std::{
     ops::Div,
+    ptr::hash,
     sync::mpsc::{Receiver, Sender},
     time::Instant,
 };
 
 use uci::{
-    Duration, UciInfoAttribute, UciMove, UciPiece, UciSearchControl, UciSquare, UciTimeControl,
+    Duration, UciInfoAttribute, UciMove, UciOptionConfig, UciPiece, UciSearchControl, UciSquare,
+    UciTimeControl,
 };
 
 use crate::board::{
@@ -69,7 +71,7 @@ impl Engine for GrandChessEngine {
             self.node_count = 0;
 
             let start = Instant::now();
-            let score = self.neg_max(d as i32, 0, &self.board.clone(), alpha, beta, reciver);
+            let score = self.neg_max(d as i32, 0, &self.board.clone(), alpha, beta, Some(reciver));
 
             let time = start.elapsed();
 
@@ -176,6 +178,37 @@ impl Engine for GrandChessEngine {
         self.history_moves.fill([0; 64]);
         self.killer_moves.fill([Move::null(); MAX_PLY]);
         self.repetition_table.fill(0);
+    }
+
+    fn options() -> Vec<UciOptionConfig> {
+        vec![
+            UciOptionConfig::Spin {
+                name: "Hash".to_owned(),
+                default: Some(0x1000000),
+                min: None,
+                max: None,
+            },
+            UciOptionConfig::Spin {
+                name: "Threads".to_owned(),
+                default: Some(1),
+                min: Some(1),
+                max: Some(1),
+            },
+        ]
+    }
+
+    fn set_option(&mut self, name: &str, value: Option<&str>) {
+        match name {
+            "Hash" => self.tt.resize(match value.unwrap_or("1").parse() {
+                Ok(num) => num,
+                Err(e) => {
+                    eprintln!("could not parse option due to error: {}", e);
+                    return;
+                }
+            }),
+            "Threads" => return,
+            _ => eprintln!("Invalid option {}", name),
+        }
     }
 
     fn set_pos(&mut self, fen: &str, moves: Vec<UciMove>) {

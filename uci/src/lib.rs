@@ -1,5 +1,6 @@
 use std::{
     io::{BufRead, Write},
+    marker::PhantomData,
     sync::mpsc::{channel, Receiver, Sender},
     thread::{self, JoinHandle},
 };
@@ -19,13 +20,9 @@ pub trait Engine {
         search_control: Option<UciSearchControl>,
     );
 
-    fn hash_option() -> (u32, u32, u32) {
-        (1, 1, 1)
-    }
+    fn options() -> Vec<UciOptionConfig>;
 
-    fn thread_option() -> (u32, u32, u32) {
-        (1, 1, 1)
-    }
+    fn set_option(&mut self, name: &str, value: Option<&str>);
 
     fn new_game(&mut self);
 
@@ -43,6 +40,10 @@ pub enum EngineCommand {
         time_control: Option<vampirc_uci::UciTimeControl>,
         search_control: Option<vampirc_uci::UciSearchControl>,
     },
+    SetOption {
+        name: String,
+        value: Option<String>,
+    },
 }
 
 pub enum RecivedMessage {
@@ -52,7 +53,7 @@ pub enum RecivedMessage {
     Uci(UciMessage),
 }
 
-pub struct UciConnection<W: Write> {
+pub struct UciConnection<W: Write, E: 'static + Engine + Send> {
     writer: W,
 
     message_reciver: Receiver<RecivedMessage>,
@@ -62,14 +63,12 @@ pub struct UciConnection<W: Write> {
     engine_sender: Sender<EngineCommand>,
 
     input_thread: JoinHandle<()>,
+
+    e: PhantomData<E>,
 }
 
-impl<W: Write> UciConnection<W> {
-    pub fn new<R: 'static + BufRead + Send, E: 'static + Engine + Send + Sync>(
-        reader: R,
-        writer: W,
-        mut engine: E,
-    ) -> Self {
+impl<W: Write, E: 'static + Engine + Send> UciConnection<W, E> {
+    pub fn new<R: 'static + BufRead + Send>(reader: R, writer: W, mut engine: E) -> Self {
         let (engine_command_sender, engine_command_recv) = channel();
 
         let (stop_sender, stop_recv) = channel();
@@ -92,6 +91,9 @@ impl<W: Write> UciConnection<W> {
                     EngineCommand::IsReady => {
                         _ = message_sender.send(RecivedMessage::ReadyOk);
                     }
+                    EngineCommand::SetOption { name, value } => {
+                        engine.set_option(&name, value.as_deref());
+                    }
                 }
             }
         });
@@ -111,6 +113,7 @@ impl<W: Write> UciConnection<W> {
             engine_sender: engine_command_sender,
             stop_sender,
             input_thread,
+            e: Default::default(),
         }
     }
 
@@ -120,6 +123,12 @@ impl<W: Write> UciConnection<W> {
                 RecivedMessage::Uci(message) => match message {
                     UciMessage::Uci => {
                         self.writer.write_fmt(format_args!("{}\n", UciMessage::UciOk)).unwrap();
+
+                        for option in E::options() {
+                            _ = self
+                                .writer
+                                .write_fmt(format_args!("{}\n", UciMessage::Option(option)))
+                        }
                     }
                     UciMessage::IsReady => {
                         _ = self.engine_sender.send(EngineCommand::IsReady);
@@ -145,6 +154,9 @@ impl<W: Write> UciConnection<W> {
                             .writer
                             .write_fmt(format_args!("{}\n", UciMessage::ReadyOk))
                             .unwrap();
+                    }
+                    UciMessage::SetOption { name, value } => {
+                        _ = self.engine_sender.send(EngineCommand::SetOption { name, value })
                     }
                     UciMessage::Stop => {
                         let _ = self.stop_sender.send(());
