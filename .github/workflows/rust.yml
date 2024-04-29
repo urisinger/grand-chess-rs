@@ -22,6 +22,6 @@ jobs:
       run: rustup default nightly
     - name: Build
       run: cargo build --release --verbose
-    - name: Run tests
+    - name: Test
       run: cargo test --release --verbose
 
