@@ -191,7 +191,7 @@ impl GrandChessEngine {
             return self.quiescence(ply, board, alpha, beta);
         }
 
-        if self.node_count % 2048 == 0 {
+        if self.node_count & 16383 == 0 {
             if ((self.max_time.is_some() && Instant::now() > self.max_time.unwrap())
                 || reciver.map(|recv| recv.try_recv().is_ok()).unwrap_or(false))
                 && !self.dont_stop

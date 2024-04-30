@@ -1,12 +1,11 @@
 use std::{
     ops::Div,
-    ptr::hash,
     sync::mpsc::{Receiver, Sender},
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use uci::{
-    Duration, UciInfoAttribute, UciMove, UciOptionConfig, UciPiece, UciSearchControl, UciSquare,
+    UciInfoAttribute, UciMove, UciOptionConfig, UciPiece, UciSearchControl, UciSquare,
     UciTimeControl,
 };
 
@@ -38,9 +37,7 @@ impl Engine for GrandChessEngine {
 
         time_control.map(|t| match t {
             UciTimeControl::MoveTime(t) => {
-                self.max_time = Some(
-                    Instant::now() - std::time::Duration::new(0, 8_000_000) + t.to_std().unwrap(),
-                );
+                self.max_time = Some(Instant::now() - Duration::new(0, 8_000_000) + t);
             }
             UciTimeControl::TimeLeft { white_time, black_time, moves_to_go, .. } => {
                 let moves_to_go = if moves_to_go.unwrap_or(50) == 0 {
@@ -49,13 +46,14 @@ impl Engine for GrandChessEngine {
                     moves_to_go.unwrap_or(50) as i32
                 };
 
-                self.max_time =
-                    match self.board.current_color {
-                        PieceColor::White => white_time
-                            .map(|t| Instant::now() + t.div(moves_to_go).to_std().unwrap()),
-                        PieceColor::Black => black_time
-                            .map(|t| Instant::now() + t.div(moves_to_go).to_std().unwrap()),
-                    };
+                self.max_time = match self.board.current_color {
+                    PieceColor::White => {
+                        white_time.map(|t| Instant::now() + t.div(moves_to_go as u32))
+                    }
+                    PieceColor::Black => {
+                        black_time.map(|t| Instant::now() + t.div(moves_to_go as u32))
+                    }
+                };
             }
 
             _ => {}
@@ -130,7 +128,7 @@ impl Engine for GrandChessEngine {
                     },
                     UciInfoAttribute::Nodes(self.node_count),
                     UciInfoAttribute::Nps((self.node_count as f64 / time.as_secs_f64()) as u64),
-                    UciInfoAttribute::Time(Duration::from_std(time).unwrap()),
+                    UciInfoAttribute::Time(time),
                     UciInfoAttribute::Pv(pv),
                 ]));
                 break;
@@ -145,7 +143,7 @@ impl Engine for GrandChessEngine {
                     },
                     UciInfoAttribute::Nodes(self.node_count),
                     UciInfoAttribute::Nps((self.node_count as f64 / time.as_secs_f64()) as u64),
-                    UciInfoAttribute::Time(Duration::from_std(time).unwrap()),
+                    UciInfoAttribute::Time(time),
                     UciInfoAttribute::Pv(pv),
                 ]));
                 break;
@@ -160,7 +158,7 @@ impl Engine for GrandChessEngine {
                     },
                     UciInfoAttribute::Nodes(self.node_count),
                     UciInfoAttribute::Nps((self.node_count as f64 / time.as_secs_f64()) as u64),
-                    UciInfoAttribute::Time(Duration::from_std(time).unwrap()),
+                    UciInfoAttribute::Time(time),
                     UciInfoAttribute::Pv(pv),
                 ]));
             }
