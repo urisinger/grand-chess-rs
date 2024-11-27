@@ -1,4 +1,3 @@
-#![allow(clippy::no_effect)]
 use std::io::Read;
 
 use super::{

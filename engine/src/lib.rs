@@ -1,5 +1,5 @@
 #![feature(generic_const_exprs, test)]
-#![allow(incomplete_features)]
+#![allow(incomplete_features, clippy::identity_op, clippy::needless_range_loop)]
 pub mod board;
 pub mod nnue;
 mod transposition;
@@ -191,14 +191,13 @@ impl GrandChessEngine {
             return self.quiescence(ply, board, alpha, beta);
         }
 
-        if self.node_count & 16383 == 0 {
-            if ((self.max_time.is_some() && Instant::now() > self.max_time.unwrap())
+        if self.node_count & 16383 == 0
+            && ((self.max_time.is_some() && Instant::now() > self.max_time.unwrap())
                 || reciver.map(|recv| recv.try_recv().is_ok()).unwrap_or(false))
-                && !self.dont_stop
-            {
-                self.stop = true;
-                return STOPPED;
-            }
+            && !self.dont_stop
+        {
+            self.stop = true;
+            return STOPPED;
         }
 
         let is_pv = (beta - alpha) > 1;
@@ -379,14 +378,12 @@ impl GrandChessEngine {
 
         if capture != PieceType::Empty {
             (6 - piece.get_type() as u32) + capture as u32 * 100 + 10000
+        } else if self.killer_moves[0][ply] == r#move {
+            9000
+        } else if self.killer_moves[1][ply] == r#move {
+            8000
         } else {
-            if self.killer_moves[0][ply] == r#move {
-                9000
-            } else if self.killer_moves[1][ply] == r#move {
-                8000
-            } else {
-                self.history_moves[piece as usize][to]
-            }
+            self.history_moves[piece as usize][to]
         }
     }
 

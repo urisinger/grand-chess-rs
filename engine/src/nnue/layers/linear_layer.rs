@@ -25,7 +25,7 @@ where
         }
 
         r.read_exact(unsafe {
-            slice::from_raw_parts_mut(self.weights.as_mut_ptr() as *mut i8 as *mut u8, O * I)
+            slice::from_raw_parts_mut(self.weights.as_mut_ptr() as *mut u8, O * I)
         })
         .unwrap();
     }

@@ -170,7 +170,7 @@ fn generate_knight_attacks() -> [u64; 64] {
             let target_rank = rank + offset.0;
             let target_file = file + offset.1;
 
-            if target_rank >= 0 && target_rank < 8 && target_file >= 0 && target_file < 8 {
+            if (0..8).contains(&target_rank) && (0..8).contains(&target_file) {
                 let target_square = target_rank * 8 + target_file;
                 bitmask |= 1u64 << target_square;
             }
@@ -196,7 +196,7 @@ fn generate_king_attacks() -> [u64; 64] {
             let target_rank = rank + offset.0;
             let target_file = file + offset.1;
 
-            if target_rank >= 0 && target_rank < 8 && target_file >= 0 && target_file < 8 {
+            if (0..8).contains(&target_rank) && (0..8).contains(&target_file) {
                 let target_square = target_rank * 8 + target_file;
                 bitmask |= 1u64 << target_square;
             }
@@ -211,7 +211,7 @@ fn directional_attack(square: usize, xdir: i32, ydir: i32, occupancy: u64) -> u6
     let mut target_square_x = (square % 8) as i32 + xdir;
     let mut target_square_y = (square / 8) as i32 + ydir;
 
-    while target_square_x >= 0 && target_square_x < 8 && target_square_y >= 0 && target_square_y < 8
+    while (0..8).contains(&target_square_x) && (0..8).contains(&target_square_y)
     {
         let target_square = (target_square_y * 8 + target_square_x) as u64;
         attack_mask |= 1u64 << target_square;

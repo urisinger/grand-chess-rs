@@ -62,7 +62,7 @@ impl FeatureSet for HalfKP {
         prespective: PieceColor,
     ) {
         let king_sq = board.bit_boards[Piece::new(PieceType::King, prespective)].trailing_zeros();
-        for d in delta.into_iter() {
+        for d in delta.iter() {
             if d.piece.get_type() == PieceType::King {
                 continue;
             }

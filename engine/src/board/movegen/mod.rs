@@ -61,19 +61,22 @@ impl Moves {
     pub fn len(&self) -> usize {
         self.len
     }
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
 }
 
 pub fn generate_moves(board: &Board) -> Moves {
     let mut moves = Moves::default();
 
-    generate_pawn_moves(&board, &mut moves);
+    generate_pawn_moves(board, &mut moves);
 
     let mut knights = board.bit_boards[Piece::new(PieceType::Knight, board.current_color)];
     while knights != 0 {
         let square = knights.trailing_zeros() as usize;
 
         generate_piece_moves(
-            &board,
+            board,
             &mut moves,
             square,
             KNIGHT_ATTACKS[square] & !board.bit_boards.col_occupancy(board.current_color),
@@ -138,7 +141,7 @@ pub fn generate_moves(board: &Board) -> Moves {
             }
 
             generate_piece_moves(
-                &board,
+                board,
                 &mut moves,
                 square as usize,
                 KING_ATTACKS[square as usize]
@@ -152,7 +155,7 @@ pub fn generate_moves(board: &Board) -> Moves {
         let square = bishops.trailing_zeros() as usize;
 
         generate_sliding_moves(
-            &board,
+            board,
             &mut moves,
             square,
             BISHOP_MASKS[square],
@@ -168,7 +171,7 @@ pub fn generate_moves(board: &Board) -> Moves {
         let square = rooks.trailing_zeros() as usize;
 
         generate_sliding_moves(
-            &board,
+            board,
             &mut moves,
             square,
             ROOK_MASKS[square],
@@ -184,7 +187,7 @@ pub fn generate_moves(board: &Board) -> Moves {
         let square = queens.trailing_zeros() as usize;
 
         generate_sliding_moves(
-            &board,
+            board,
             &mut moves,
             square,
             ROOK_MASKS[square],
@@ -192,7 +195,7 @@ pub fn generate_moves(board: &Board) -> Moves {
             &ROOK_ATTACKS[square],
         );
         generate_sliding_moves(
-            &board,
+            board,
             &mut moves,
             square,
             BISHOP_MASKS[square],
@@ -214,7 +217,7 @@ pub fn generate_captures(board: &Board) -> Moves {
         let square = bishops.trailing_zeros() as usize;
 
         generate_sliding_captures(
-            &board,
+            board,
             &mut moves,
             square,
             BISHOP_MASKS[square],
@@ -230,7 +233,7 @@ pub fn generate_captures(board: &Board) -> Moves {
         let square = rooks.trailing_zeros() as usize;
 
         generate_sliding_captures(
-            &board,
+            board,
             &mut moves,
             square,
             ROOK_MASKS[square],
@@ -246,7 +249,7 @@ pub fn generate_captures(board: &Board) -> Moves {
         let square = queens.trailing_zeros() as usize;
 
         generate_sliding_captures(
-            &board,
+            board,
             &mut moves,
             square,
             ROOK_MASKS[square],
@@ -254,7 +257,7 @@ pub fn generate_captures(board: &Board) -> Moves {
             &ROOK_ATTACKS[square],
         );
         generate_sliding_captures(
-            &board,
+            board,
             &mut moves,
             square,
             BISHOP_MASKS[square],
@@ -270,7 +273,7 @@ pub fn generate_captures(board: &Board) -> Moves {
         let square = knights.trailing_zeros() as usize;
 
         generate_piece_moves(
-            &board,
+            board,
             &mut moves,
             square,
             KNIGHT_ATTACKS[square]
@@ -281,7 +284,7 @@ pub fn generate_captures(board: &Board) -> Moves {
         knights &= knights - 1;
     }
 
-    generate_pawn_captures(&board, &mut moves);
+    generate_pawn_captures(board, &mut moves);
 
     {
         let is_white = board.current_color == PieceColor::White;
@@ -339,7 +342,7 @@ pub fn generate_captures(board: &Board) -> Moves {
             }
 
             generate_piece_moves(
-                &board,
+                board,
                 &mut moves,
                 square as usize,
                 KING_ATTACKS[square as usize]
@@ -420,31 +423,31 @@ fn generate_pawn_moves(board: &Board, moves: &mut Moves) {
 
     while pawn_moves != 0 {
         let target_square = pawn_moves.trailing_zeros() as i32;
-        let source_square = target_square as i32 - (direction * 8);
+        let source_square = target_square - (direction * 8);
 
         let starting_rank = if is_white { 1 } else { 6 };
 
-        if source_square / 8 == starting_rank {
-            if !board.is_occupied((target_square + direction * 8) as usize) {
-                let r#move = Move::new(
-                    source_square as u32,
-                    (target_square + direction * 8) as u32,
-                    MoveType::DoublePush,
-                    Piece::new(PieceType::Pawn, board.current_color),
-                    PieceType::Empty,
-                );
+        if source_square / 8 == starting_rank
+            && !board.is_occupied((target_square + direction * 8) as usize)
+        {
+            let r#move = Move::new(
+                source_square as u32,
+                (target_square + direction * 8) as u32,
+                MoveType::DoublePush,
+                Piece::new(PieceType::Pawn, board.current_color),
+                PieceType::Empty,
+            );
 
-                if r#move.piece().get_type() != PieceType::Pawn {
-                    panic!("{:?}", r#move.piece());
-                }
-                moves.push(Move::new(
-                    source_square as u32,
-                    (target_square + direction * 8) as u32,
-                    MoveType::DoublePush,
-                    Piece::new(PieceType::Pawn, board.current_color),
-                    PieceType::Empty,
-                ))
+            if r#move.piece().get_type() != PieceType::Pawn {
+                panic!("{:?}", r#move.piece());
             }
+            moves.push(Move::new(
+                source_square as u32,
+                (target_square + direction * 8) as u32,
+                MoveType::DoublePush,
+                Piece::new(PieceType::Pawn, board.current_color),
+                PieceType::Empty,
+            ))
         }
 
         let promotion_rank = if is_white { 7 } else { 0 };
@@ -510,28 +513,28 @@ fn generate_pawn_moves(board: &Board, moves: &mut Moves) {
         if target_square / 8 == promotion_rank {
             moves.push(Move::new(
                 source_square as u32,
-                target_square as u32,
+                target_square,
                 MoveType::Promote,
                 Piece::new(PieceType::Queen, board.current_color),
                 captured_piece,
             ));
             moves.push(Move::new(
                 source_square as u32,
-                target_square as u32,
+                target_square,
                 MoveType::Promote,
                 Piece::new(PieceType::Knight, board.current_color),
                 captured_piece,
             ));
             moves.push(Move::new(
                 source_square as u32,
-                target_square as u32,
+                target_square,
                 MoveType::Promote,
                 Piece::new(PieceType::Rook, board.current_color),
                 captured_piece,
             ));
             moves.push(Move::new(
                 source_square as u32,
-                target_square as u32,
+                target_square,
                 MoveType::Promote,
                 Piece::new(PieceType::Bishop, board.current_color),
                 captured_piece,
@@ -539,7 +542,7 @@ fn generate_pawn_moves(board: &Board, moves: &mut Moves) {
         } else {
             moves.push(Move::new(
                 source_square as u32,
-                target_square as u32,
+                target_square,
                 MoveType::QuietMove,
                 Piece::new(PieceType::Pawn, board.current_color),
                 captured_piece,
@@ -560,28 +563,28 @@ fn generate_pawn_moves(board: &Board, moves: &mut Moves) {
         if target_square / 8 == promotion_rank {
             moves.push(Move::new(
                 source_square as u32,
-                target_square as u32,
+                target_square,
                 MoveType::Promote,
                 Piece::new(PieceType::Queen, board.current_color),
                 captured_piece,
             ));
             moves.push(Move::new(
                 source_square as u32,
-                target_square as u32,
+                target_square,
                 MoveType::Promote,
                 Piece::new(PieceType::Knight, board.current_color),
                 captured_piece,
             ));
             moves.push(Move::new(
                 source_square as u32,
-                target_square as u32,
+                target_square,
                 MoveType::Promote,
                 Piece::new(PieceType::Rook, board.current_color),
                 captured_piece,
             ));
             moves.push(Move::new(
                 source_square as u32,
-                target_square as u32,
+                target_square,
                 MoveType::Promote,
                 Piece::new(PieceType::Bishop, board.current_color),
                 captured_piece,
@@ -589,7 +592,7 @@ fn generate_pawn_moves(board: &Board, moves: &mut Moves) {
         } else {
             moves.push(Move::new(
                 source_square as u32,
-                target_square as u32,
+                target_square,
                 MoveType::QuietMove,
                 Piece::new(PieceType::Pawn, board.current_color),
                 captured_piece,
@@ -604,34 +607,37 @@ fn generate_pawn_moves(board: &Board, moves: &mut Moves) {
         let right_capture_square = last_double as i32 + 1;
 
         let en_passant_file = last_double % 8;
-        if en_passant_file > 0 && left_capture_square >= 0 && left_capture_square < 64 {
-            if pawns & (1 << left_capture_square) != 0 {
-                let r#move = Move::new(
-                    left_capture_square as u32,
-                    (last_double as i32 + direction * 8) as u32,
-                    MoveType::EnPassantCapture,
-                    Piece::new(PieceType::Pawn, board.current_color),
-                    PieceType::Pawn,
-                );
+        if en_passant_file > 0
+            && (0..64).contains(&left_capture_square)
+            && pawns & (1 << left_capture_square) != 0
+        {
+            let r#move = Move::new(
+                left_capture_square as u32,
+                (last_double as i32 + direction * 8) as u32,
+                MoveType::EnPassantCapture,
+                Piece::new(PieceType::Pawn, board.current_color),
+                PieceType::Pawn,
+            );
 
-                if pawns & (1 << left_capture_square) != 0 {
-                    moves.push(r#move);
-                }
+            if pawns & (1 << left_capture_square) != 0 {
+                moves.push(r#move);
             }
         }
 
-        if en_passant_file < 7 && right_capture_square >= 0 && left_capture_square < 64 {
-            if pawns & (1 << right_capture_square) != 0 {
-                let r#move = Move::new(
-                    right_capture_square as u32,
-                    (last_double as i32 + direction * 8) as u32,
-                    MoveType::EnPassantCapture,
-                    Piece::new(PieceType::Pawn, board.current_color),
-                    PieceType::Pawn,
-                );
+        if en_passant_file < 7
+            && right_capture_square >= 0
+            && left_capture_square < 64
+            && pawns & (1 << right_capture_square) != 0
+        {
+            let r#move = Move::new(
+                right_capture_square as u32,
+                (last_double as i32 + direction * 8) as u32,
+                MoveType::EnPassantCapture,
+                Piece::new(PieceType::Pawn, board.current_color),
+                PieceType::Pawn,
+            );
 
-                moves.push(r#move);
-            }
+            moves.push(r#move);
         }
     }
 }
@@ -662,28 +668,28 @@ fn generate_pawn_captures(board: &Board, moves: &mut Moves) {
         if target_square / 8 == promotion_rank {
             moves.push(Move::new(
                 source_square as u32,
-                target_square as u32,
+                target_square,
                 MoveType::Promote,
                 Piece::new(PieceType::Queen, board.current_color),
                 captured_piece,
             ));
             moves.push(Move::new(
                 source_square as u32,
-                target_square as u32,
+                target_square,
                 MoveType::Promote,
                 Piece::new(PieceType::Knight, board.current_color),
                 captured_piece,
             ));
             moves.push(Move::new(
                 source_square as u32,
-                target_square as u32,
+                target_square,
                 MoveType::Promote,
                 Piece::new(PieceType::Rook, board.current_color),
                 captured_piece,
             ));
             moves.push(Move::new(
                 source_square as u32,
-                target_square as u32,
+                target_square,
                 MoveType::Promote,
                 Piece::new(PieceType::Bishop, board.current_color),
                 captured_piece,
@@ -691,7 +697,7 @@ fn generate_pawn_captures(board: &Board, moves: &mut Moves) {
         } else {
             moves.push(Move::new(
                 source_square as u32,
-                target_square as u32,
+                target_square,
                 MoveType::QuietMove,
                 Piece::new(PieceType::Pawn, board.current_color),
                 captured_piece,
@@ -712,28 +718,28 @@ fn generate_pawn_captures(board: &Board, moves: &mut Moves) {
         if target_square / 8 == promotion_rank {
             moves.push(Move::new(
                 source_square as u32,
-                target_square as u32,
+                target_square,
                 MoveType::Promote,
                 Piece::new(PieceType::Queen, board.current_color),
                 captured_piece,
             ));
             moves.push(Move::new(
                 source_square as u32,
-                target_square as u32,
+                target_square,
                 MoveType::Promote,
                 Piece::new(PieceType::Knight, board.current_color),
                 captured_piece,
             ));
             moves.push(Move::new(
                 source_square as u32,
-                target_square as u32,
+                target_square,
                 MoveType::Promote,
                 Piece::new(PieceType::Rook, board.current_color),
                 captured_piece,
             ));
             moves.push(Move::new(
                 source_square as u32,
-                target_square as u32,
+                target_square,
                 MoveType::Promote,
                 Piece::new(PieceType::Bishop, board.current_color),
                 captured_piece,
@@ -741,7 +747,7 @@ fn generate_pawn_captures(board: &Board, moves: &mut Moves) {
         } else {
             moves.push(Move::new(
                 source_square as u32,
-                target_square as u32,
+                target_square,
                 MoveType::QuietMove,
                 Piece::new(PieceType::Pawn, board.current_color),
                 captured_piece,
@@ -756,34 +762,37 @@ fn generate_pawn_captures(board: &Board, moves: &mut Moves) {
         let right_capture_square = last_double as i32 + 1;
 
         let en_passant_file = last_double % 8;
-        if en_passant_file > 0 && left_capture_square >= 0 && left_capture_square < 64 {
-            if pawns & (1 << left_capture_square) != 0 {
-                let r#move = Move::new(
-                    left_capture_square as u32,
-                    (last_double as i32 + direction * 8) as u32,
-                    MoveType::EnPassantCapture,
-                    Piece::new(PieceType::Pawn, board.current_color),
-                    PieceType::Pawn,
-                );
+        if en_passant_file > 0
+            && (0..64).contains(&left_capture_square)
+            && pawns & (1 << left_capture_square) != 0
+        {
+            let r#move = Move::new(
+                left_capture_square as u32,
+                (last_double as i32 + direction * 8) as u32,
+                MoveType::EnPassantCapture,
+                Piece::new(PieceType::Pawn, board.current_color),
+                PieceType::Pawn,
+            );
 
-                if pawns & (1 << left_capture_square) != 0 {
-                    moves.push(r#move);
-                }
+            if pawns & (1 << left_capture_square) != 0 {
+                moves.push(r#move);
             }
         }
 
-        if en_passant_file < 7 && right_capture_square >= 0 && left_capture_square < 64 {
-            if pawns & (1 << right_capture_square) != 0 {
-                let r#move = Move::new(
-                    right_capture_square as u32,
-                    (last_double as i32 + direction * 8) as u32,
-                    MoveType::EnPassantCapture,
-                    Piece::new(PieceType::Pawn, board.current_color),
-                    PieceType::Pawn,
-                );
+        if en_passant_file < 7
+            && right_capture_square >= 0
+            && left_capture_square < 64
+            && pawns & (1 << right_capture_square) != 0
+        {
+            let r#move = Move::new(
+                right_capture_square as u32,
+                (last_double as i32 + direction * 8) as u32,
+                MoveType::EnPassantCapture,
+                Piece::new(PieceType::Pawn, board.current_color),
+                PieceType::Pawn,
+            );
 
-                moves.push(r#move);
-            }
+            moves.push(r#move);
         }
     }
 }

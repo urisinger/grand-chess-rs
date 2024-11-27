@@ -8,7 +8,6 @@ mod scores;
 
 use std::{
     fmt::Write,
-    num::ParseIntError,
     ops::{Deref, DerefMut},
 };
 
@@ -106,6 +105,12 @@ pub struct PieceDelta {
 pub struct PiecesDelta {
     pieces: [PieceDelta; 3],
     len: usize,
+}
+
+impl Default for PiecesDelta {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PiecesDelta {
@@ -298,7 +303,7 @@ impl Board {
         let (from, to, move_type, piece, capture) = r#move.unpack();
 
         if capture != PieceType::Empty {
-            self.bit_boards.clear_piece(to as usize, Piece::new(capture, !self.current_color));
+            self.bit_boards.clear_piece(to, Piece::new(capture, !self.current_color));
 
             self.hash ^= PIECE_KEYS[Piece::new(capture, !self.current_color) as usize][to];
 
@@ -320,13 +325,13 @@ impl Board {
             }
         }
 
-        self.bit_boards.set_piece(to as usize, piece);
+        self.bit_boards.set_piece(to, piece);
 
-        self.hash ^= PIECE_KEYS[piece as usize][to as usize];
+        self.hash ^= PIECE_KEYS[piece as usize][to];
 
         if move_type == MoveType::Promote {
             self.bit_boards
-                .clear_piece(from as usize, Piece::new(PieceType::Pawn, self.current_color));
+                .clear_piece(from, Piece::new(PieceType::Pawn, self.current_color));
 
             self.hash ^= PIECE_KEYS[Piece::new(PieceType::Pawn, self.current_color) as usize][from];
 
@@ -347,7 +352,7 @@ impl Board {
         } else {
             self.hash ^= PIECE_KEYS[piece as usize][from];
 
-            self.bit_boards.clear_piece(from as usize, piece);
+            self.bit_boards.clear_piece(from, piece);
 
             self.eval += POSITIONAL_SCORES[piece.get_type() as usize]
                 [to ^ (56 * !self.current_color as usize)]
@@ -439,7 +444,7 @@ impl Board {
             self.bit_boards.clear_piece(captured_pawn_square as usize, captured_piece);
 
             self.hash ^= PIECE_KEYS[captured_piece as usize][captured_pawn_square as usize];
-            self.hash ^= PIECE_KEYS[captured_piece as usize][to as usize];
+            self.hash ^= PIECE_KEYS[captured_piece as usize][to];
 
             self.eval += POSITIONAL_SCORES[PieceType::Pawn as usize]
                 [captured_pawn_square as usize ^ (56 * self.current_color as usize)]
@@ -454,7 +459,7 @@ impl Board {
         }
 
         self.last_double = if move_type == MoveType::DoublePush {
-            self.hash ^= DOUBLE_PUSH_KEYS[to as usize];
+            self.hash ^= DOUBLE_PUSH_KEYS[to];
             Some(to as u32)
         } else {
             None
@@ -469,7 +474,7 @@ impl Board {
         let (from, to, move_type, piece, capture) = r#move.unpack();
 
         if capture != PieceType::Empty {
-            self.bit_boards.clear_piece(to as usize, Piece::new(capture, !self.current_color));
+            self.bit_boards.clear_piece(to, Piece::new(capture, !self.current_color));
 
             self.hash ^= PIECE_KEYS[Piece::new(capture, !self.current_color) as usize][to];
 
@@ -477,13 +482,13 @@ impl Board {
                 + POSITIONAL_SCORES[capture as usize][to ^ (56 * self.current_color as usize)];
         }
 
-        self.bit_boards.set_piece(to as usize, piece);
+        self.bit_boards.set_piece(to, piece);
 
-        self.hash ^= PIECE_KEYS[piece as usize][to as usize];
+        self.hash ^= PIECE_KEYS[piece as usize][to];
 
         if move_type == MoveType::Promote {
             self.bit_boards
-                .clear_piece(from as usize, Piece::new(PieceType::Pawn, self.current_color));
+                .clear_piece(from, Piece::new(PieceType::Pawn, self.current_color));
 
             self.hash ^= PIECE_KEYS[Piece::new(PieceType::Pawn, self.current_color) as usize][from];
 
@@ -497,7 +502,7 @@ impl Board {
         } else {
             self.hash ^= PIECE_KEYS[piece as usize][from];
 
-            self.bit_boards.clear_piece(from as usize, piece);
+            self.bit_boards.clear_piece(from, piece);
 
             self.eval += POSITIONAL_SCORES[piece.get_type() as usize]
                 [to ^ (56 * !self.current_color as usize)]
@@ -585,7 +590,7 @@ impl Board {
             self.bit_boards.clear_piece(captured_pawn_square as usize, captured_piece);
 
             self.hash ^= PIECE_KEYS[captured_piece as usize][captured_pawn_square as usize];
-            self.hash ^= PIECE_KEYS[captured_piece as usize][to as usize];
+            self.hash ^= PIECE_KEYS[captured_piece as usize][to];
 
             self.eval += POSITIONAL_SCORES[PieceType::Pawn as usize]
                 [captured_pawn_square as usize ^ (56 * self.current_color as usize)]
@@ -600,7 +605,7 @@ impl Board {
         }
 
         self.last_double = if move_type == MoveType::DoublePush {
-            self.hash ^= DOUBLE_PUSH_KEYS[to as usize];
+            self.hash ^= DOUBLE_PUSH_KEYS[to];
             Some(to as u32)
         } else {
             None
@@ -710,7 +715,7 @@ mod tests {
 
     pub fn par_perft(board: &Board, depth: u32) -> u64 {
         let nodes = Mutex::new(0);
-        let moves = generate_moves(&board);
+        let moves = generate_moves(board);
 
         moves.par_iter().for_each(|&r#move| {
             let mut new_board = board.clone();

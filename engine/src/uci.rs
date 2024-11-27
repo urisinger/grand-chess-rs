@@ -312,18 +312,14 @@ pub fn parse_move(board: &Board, uci_move: UciMove) -> Move {
             }
         } else if board.current_color == PieceColor::White
             && uci_move.from.rank == 4
-            && uci_move.to.rank == 3
-            && (uci_move.to.file as u8).abs_diff(uci_move.from.file as u8) == 1
-        {
-            if board.bit_boards.piece_at(to - 8).get_type() == PieceType::Pawn {
-                return Move::new(
-                    from as u32,
-                    to as u32,
-                    MoveType::EnPassantCapture,
-                    Piece::new(PieceType::Pawn, board.current_color),
-                    PieceType::Pawn,
-                );
-            }
+            && uci_move.to.rank == 3 && (uci_move.to.file as u8).abs_diff(uci_move.from.file as u8) == 1 && board.bit_boards.piece_at(to - 8).get_type() == PieceType::Pawn {
+            return Move::new(
+                from as u32,
+                to as u32,
+                MoveType::EnPassantCapture,
+                Piece::new(PieceType::Pawn, board.current_color),
+                PieceType::Pawn,
+            );
         }
     }
 

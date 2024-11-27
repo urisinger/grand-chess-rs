@@ -1,8 +1,14 @@
-use std::{ops::Not, str::FromStr};
+use std::{
+    fmt::{Display, Write},
+    ops::Not,
+    str::FromStr,
+};
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 #[repr(u8)]
+#[derive(Default)]
 pub enum PieceColor {
+    #[default]
     White = 0,
     Black = 1,
 }
@@ -17,25 +23,20 @@ impl Not for PieceColor {
     }
 }
 
-impl Default for PieceColor {
-    fn default() -> Self {
-        PieceColor::White
-    }
-}
-
 impl TryFrom<u8> for PieceColor {
     type Error = ();
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         if value > Self::Black as u8 {
             Err(())
         } else {
-            unsafe { Ok(core::mem::transmute(value)) }
+            unsafe { Ok(core::mem::transmute::<u8, PieceColor>(value)) }
         }
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 #[repr(u8)]
+#[derive(Default)]
 pub enum PieceType {
     Pawn = 0,
     Knight = 1,
@@ -43,12 +44,13 @@ pub enum PieceType {
     Rook = 3,
     Queen = 4,
     King = 5,
+    #[default]
     Empty = 6,
 }
 
-impl ToString for PieceType {
-    fn to_string(&self) -> String {
-        match *self {
+impl Display for PieceType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_char(match *self {
             PieceType::Pawn => 'p',
             PieceType::Knight => 'n',
             PieceType::Bishop => 'b',
@@ -56,15 +58,14 @@ impl ToString for PieceType {
             PieceType::Queen => 'q',
             PieceType::King => 'k',
             PieceType::Empty => ' ',
-        }
-        .to_string()
+        })
     }
 }
 
 impl FromStr for PieceType {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(match s.as_bytes().get(0).ok_or(())? {
+        Ok(match s.as_bytes().first().ok_or(())? {
             b'p' => PieceType::Pawn,
             b'n' => PieceType::Knight,
             b'b' => PieceType::Bishop,
@@ -74,12 +75,6 @@ impl FromStr for PieceType {
             b' ' => PieceType::Empty,
             _ => return Err(()),
         })
-    }
-}
-
-impl Default for PieceType {
-    fn default() -> Self {
-        PieceType::Empty
     }
 }
 
@@ -96,6 +91,7 @@ impl From<u8> for PieceType {
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 #[repr(u8)]
+#[derive(Default)]
 pub enum Piece {
     WhitePawn = 0,
     BlackPawn = 1,
@@ -109,18 +105,13 @@ pub enum Piece {
     BlackQueen = 9,
     WhiteKing = 10,
     BlackKing = 11,
+    #[default]
     Empty = 12,
 }
 
-impl ToString for Piece {
-    fn to_string(&self) -> String {
-        char::from(*self).to_string()
-    }
-}
-
-impl Default for Piece {
-    fn default() -> Self {
-        Piece::Empty
+impl Display for Piece {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_char(char::from(*self))
     }
 }
 
