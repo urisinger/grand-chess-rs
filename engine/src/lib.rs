@@ -382,7 +382,7 @@ impl GrandChessEngine {
         } else {
             if self.killer_moves[0][ply] == r#move {
                 9000
-            } else if self.killer_moves[0][ply] == r#move {
+            } else if self.killer_moves[1][ply] == r#move {
                 8000
             } else {
                 self.history_moves[piece as usize][to as usize]
