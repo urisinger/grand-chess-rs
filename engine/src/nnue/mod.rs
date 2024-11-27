@@ -60,6 +60,12 @@ pub struct FeatureList<const N: usize> {
     len: usize,
 }
 
+impl<const N: usize> Default for FeatureList<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const N: usize> FeatureList<N> {
     pub fn new() -> Self {
         Self { features: [0; N], len: 0 }
@@ -229,8 +235,6 @@ where
         let mut input = [0; NET_IN];
         self.transformer.transform(&self.acc_stack[ply], &mut input, side);
 
-        let eval = self.net.eval(&input, &mut self.net_buffer);
-
-        eval
+        self.net.eval(&input, &mut self.net_buffer)
     }
 }

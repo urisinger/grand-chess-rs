@@ -347,7 +347,7 @@ impl GrandChessEngine {
         }
 
         if moves_searched == 0 {
-            return in_check as i32 * -(MATE_VALUE + depth as i32);
+            return in_check as i32 * -(MATE_VALUE + depth);
         } else {
             self.tt.write_entry(
                 THash::new(board.hash, depth, alpha, best_move, hash_flag),
@@ -355,7 +355,7 @@ impl GrandChessEngine {
             );
         }
 
-        return alpha;
+        alpha
     }
 
     fn is_repetition(&self, hash: u64, ply: usize) -> bool {
@@ -385,7 +385,7 @@ impl GrandChessEngine {
             } else if self.killer_moves[1][ply] == r#move {
                 8000
             } else {
-                self.history_moves[piece as usize][to as usize]
+                self.history_moves[piece as usize][to]
             }
         }
     }

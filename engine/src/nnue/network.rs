@@ -1,3 +1,4 @@
+#![allow(clippy::no_effect)]
 use std::io::Read;
 
 use super::{
@@ -55,7 +56,7 @@ where
     }
 
     fn eval(&self, input: &[i8; L_1], buffer: &mut LayersBuffer<L_2, L_3>) -> i32 {
-        self.l_1.propagate(&input, &mut buffer.l_1);
+        self.l_1.propagate(input, &mut buffer.l_1);
 
         self.r_1.propagate(&buffer.l_1, &mut buffer.r_1);
         self.l_2.propagate(&buffer.r_1, &mut buffer.l_2);

@@ -32,32 +32,34 @@ impl Engine for GrandChessEngine {
 
         let mut best_move = UciMove::from_to(UciSquare::from('a', 1), UciSquare::from('a', 1));
 
-        let depth = search_control.map(|s| s.depth.map(|d| d as u32)).flatten().unwrap_or(1000);
+        let depth = search_control.and_then(|s| s.depth.map(|d| d as u32)).unwrap_or(1000);
         self.stop = false;
 
-        time_control.map(|t| match t {
-            UciTimeControl::MoveTime(t) => {
-                self.max_time = Some(Instant::now() - Duration::new(0, 8_000_000) + t);
-            }
-            UciTimeControl::TimeLeft { white_time, black_time, moves_to_go, .. } => {
-                let moves_to_go = if moves_to_go.unwrap_or(50) == 0 {
-                    1
-                } else {
-                    moves_to_go.unwrap_or(50) as i32
-                };
+        if let Some(t) = time_control {
+            match t {
+                UciTimeControl::MoveTime(t) => {
+                    self.max_time = Some(Instant::now() - Duration::new(0, 8_000_000) + t);
+                }
+                UciTimeControl::TimeLeft { white_time, black_time, moves_to_go, .. } => {
+                    let moves_to_go = if moves_to_go.unwrap_or(50) == 0 {
+                        1
+                    } else {
+                        moves_to_go.unwrap_or(50) as i32
+                    };
 
-                self.max_time = match self.board.current_color {
-                    PieceColor::White => {
-                        white_time.map(|t| Instant::now() + t.div(moves_to_go as u32))
-                    }
-                    PieceColor::Black => {
-                        black_time.map(|t| Instant::now() + t.div(moves_to_go as u32))
-                    }
-                };
-            }
+                    self.max_time = match self.board.current_color {
+                        PieceColor::White => {
+                            white_time.map(|t| Instant::now() + t.div(moves_to_go as u32))
+                        }
+                        PieceColor::Black => {
+                            black_time.map(|t| Instant::now() + t.div(moves_to_go as u32))
+                        }
+                    };
+                }
 
-            _ => {}
-        });
+                _ => {}
+            }
+        }
 
         let mut alpha = MIN_SCORE;
         let mut beta = MAX_SCORE;
@@ -204,7 +206,7 @@ impl Engine for GrandChessEngine {
                     return;
                 }
             }),
-            "Threads" => return,
+            "Threads" => (),
             _ => eprintln!("Invalid option {}", name),
         }
     }
@@ -230,31 +232,13 @@ pub fn parse_move(board: &Board, uci_move: UciMove) -> Move {
     if board.bit_boards.piece_at(from).get_type() == PieceType::Pawn
         && board.bit_boards.piece_at(to) == Piece::Empty
     {
-        if board.current_color == PieceColor::White
-            && uci_move.from.rank == 2
-            && uci_move.to.rank == 4
-            && (uci_move.to.file as u8).abs_diff(uci_move.from.file as u8) == 0
-        {
-            return Move::new(
-                from as u32,
-                to as u32,
-                MoveType::DoublePush,
-                Piece::new(PieceType::Pawn, board.current_color),
-                PieceType::Empty,
-            );
-        } else if board.current_color == PieceColor::Black
-            && uci_move.from.rank == 7
-            && uci_move.to.rank == 5
-            && (uci_move.to.file as u8).abs_diff(uci_move.from.file as u8) == 0
-        {
-            return Move::new(
-                from as u32,
-                to as u32,
-                MoveType::DoublePush,
-                Piece::new(PieceType::Pawn, board.current_color),
-                PieceType::Empty,
-            );
-        }
+        return Move::new(
+            from as u32,
+            to as u32,
+            MoveType::DoublePush,
+            Piece::new(PieceType::Pawn, board.current_color),
+            PieceType::Empty,
+        );
     }
 
     // Check if the move is a castling move
