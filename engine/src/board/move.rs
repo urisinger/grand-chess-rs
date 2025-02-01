@@ -3,9 +3,29 @@ use std::fmt;
 use super::{Piece, PieceType};
 
 #[derive(Default, Clone, Copy, Eq, PartialEq)]
-pub struct Move(u32);
+pub struct Move(pub u32);
 
 impl fmt::Display for Move {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let from_file: char = (b'a' + (self.from() % 8) as u8).into();
+        let to_file: char = (b'a' + (self.to() % 8) as u8).into();
+        f.write_fmt(format_args!(
+            "{}{}{}{}",
+            from_file,
+            self.from() / 8 + 1,
+            to_file,
+            self.to() / 8 + 1
+        ))?;
+
+        if self.move_type() == MoveType::Promote {
+            f.write_str(&self.piece().to_string().to_lowercase())?;
+        }
+
+        Ok(())
+    }
+}
+
+impl fmt::Debug for Move {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let from_file: char = (b'a' + (self.from() % 8) as u8).into();
         let to_file: char = (b'a' + (self.to() % 8) as u8).into();
@@ -59,6 +79,7 @@ impl Move {
         Self(inner)
     }
 
+    // from, to, type, piece, captured
     #[inline]
     pub fn unpack(self) -> (usize, usize, MoveType, Piece, PieceType) {
         (

@@ -204,7 +204,7 @@ impl GrandChessEngine {
 
         let mut best_move = Move::null();
 
-        let entry = self.tt.probe_entry(board.hash, ply as u32);
+        let entry = self.tt.probe_entry(board, board.hash, ply as u32);
         if let Some(entry) = entry {
             best_move = entry.best_move;
 

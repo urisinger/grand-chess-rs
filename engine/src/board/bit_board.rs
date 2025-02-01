@@ -75,6 +75,7 @@ impl BitBoards {
         self[piece] &= !(1 << square);
     }
 
+    #[inline]
     pub fn piece_at(&self, index: usize) -> Piece {
         for i in 0..Piece::Empty as usize {
             if (1 << index) & self.pieces[i] != 0 {

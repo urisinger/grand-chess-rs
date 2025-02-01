@@ -12,7 +12,7 @@ use uci::{
 use crate::board::{
     piece::{Piece, PieceColor, PieceType},
     r#move::{Move, MoveType},
-    Board,
+    Board, NoDelta,
 };
 use uci::{Engine, RecivedMessage};
 
@@ -215,7 +215,7 @@ impl Engine for GrandChessEngine {
         self.board = Board::from_fen(fen).unwrap();
 
         for uci_move in moves {
-            self.board.make_move(parse_move(&self.board, uci_move));
+            self.board.make_move(parse_move(&self.board, uci_move), NoDelta);
             self.ply_offset += 1;
         }
     }
@@ -229,9 +229,7 @@ pub fn parse_move(board: &Board, uci_move: UciMove) -> Move {
     let from = ((uci_move.from.file as u8 - b'a') + (8 * (uci_move.from.rank - 1))) as usize;
     let to = ((uci_move.to.file as u8 - b'a') + (8 * (uci_move.to.rank - 1))) as usize;
 
-    if board.bit_boards.piece_at(from).get_type() == PieceType::Pawn
-        && board.bit_boards.piece_at(to) == Piece::Empty
-    {
+    if board.piece_at(from).get_type() == PieceType::Pawn && board.piece_at(to) == Piece::Empty {
         return Move::new(
             from as u32,
             to as u32,
@@ -244,7 +242,7 @@ pub fn parse_move(board: &Board, uci_move: UciMove) -> Move {
     // Check if the move is a castling move
     if from == 4
         && to == 6
-        && board.bit_boards.piece_at(from).get_type() == PieceType::King
+        && board.piece_at(from).get_type() == PieceType::King
         && board.current_color == PieceColor::White
     {
         return Move::new(
@@ -256,7 +254,7 @@ pub fn parse_move(board: &Board, uci_move: UciMove) -> Move {
         );
     } else if from == 4
         && to == 2
-        && board.bit_boards.piece_at(from).get_type() == PieceType::King
+        && board.piece_at(from).get_type() == PieceType::King
         && board.current_color == PieceColor::White
     {
         return Move::new(
@@ -268,7 +266,7 @@ pub fn parse_move(board: &Board, uci_move: UciMove) -> Move {
         );
     } else if from == 60
         && to == 62
-        && board.bit_boards.piece_at(from).get_type() == PieceType::King
+        && board.piece_at(from).get_type() == PieceType::King
         && board.current_color == PieceColor::Black
     {
         return Move::new(
@@ -280,7 +278,7 @@ pub fn parse_move(board: &Board, uci_move: UciMove) -> Move {
         );
     } else if from == 60
         && to == 58
-        && board.bit_boards.piece_at(from).get_type() == PieceType::King
+        && board.piece_at(from).get_type() == PieceType::King
         && board.current_color == PieceColor::Black
     {
         return Move::new(
@@ -293,15 +291,13 @@ pub fn parse_move(board: &Board, uci_move: UciMove) -> Move {
     }
 
     // Check if the move is an en passant capture
-    if board.bit_boards.piece_at(from).get_type() == PieceType::Pawn
-        && board.bit_boards.piece_at(to) == Piece::Empty
-    {
+    if board.piece_at(from).get_type() == PieceType::Pawn && board.piece_at(to) == Piece::Empty {
         if board.current_color == PieceColor::Black
             && uci_move.from.rank == 5
             && uci_move.to.rank == 6
             && (uci_move.to.file as u8).abs_diff(uci_move.from.file as u8) == 1
         {
-            if board.bit_boards.piece_at(to + 8).get_type() == PieceType::Pawn {
+            if board.piece_at(to + 8).get_type() == PieceType::Pawn {
                 return Move::new(
                     from as u32,
                     to as u32,
@@ -312,7 +308,10 @@ pub fn parse_move(board: &Board, uci_move: UciMove) -> Move {
             }
         } else if board.current_color == PieceColor::White
             && uci_move.from.rank == 4
-            && uci_move.to.rank == 3 && (uci_move.to.file as u8).abs_diff(uci_move.from.file as u8) == 1 && board.bit_boards.piece_at(to - 8).get_type() == PieceType::Pawn {
+            && uci_move.to.rank == 3
+            && (uci_move.to.file as u8).abs_diff(uci_move.from.file as u8) == 1
+            && board.piece_at(to - 8).get_type() == PieceType::Pawn
+        {
             return Move::new(
                 from as u32,
                 to as u32,
@@ -324,7 +323,7 @@ pub fn parse_move(board: &Board, uci_move: UciMove) -> Move {
     }
 
     // Check if there is a captured piece on the 'to' square
-    let captured_piece = board.bit_boards.piece_at(to).get_type();
+    let captured_piece = board.piece_at(to).get_type();
 
     // Extract promotion piece if present
     let promotion_piece = match uci_move.promotion {
@@ -344,12 +343,6 @@ pub fn parse_move(board: &Board, uci_move: UciMove) -> Move {
             captured_piece,
         )
     } else {
-        Move::new(
-            from as u32,
-            to as u32,
-            MoveType::QuietMove,
-            board.bit_boards.piece_at(from),
-            captured_piece,
-        )
+        Move::new(from as u32, to as u32, MoveType::QuietMove, board.piece_at(from), captured_piece)
     }
 }

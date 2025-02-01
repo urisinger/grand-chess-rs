@@ -9,7 +9,6 @@ use uci::UciConnection;
 
 pub fn main() {
     let mut args = env::args();
-
     args.next();
     if let Some("bench") = args.next().as_deref() {
         let mut engine = GrandChessEngine::new(1000000);

@@ -38,6 +38,7 @@ bitflags! {
 #[derive(Debug, Clone)]
 pub struct Board {
     pub bit_boards: BitBoards,
+    pub pieces: [Piece; 64],
 
     pub current_color: PieceColor,
     pub castle_flags: CastleFlags,
@@ -137,8 +138,26 @@ impl DerefMut for PiecesDelta {
     }
 }
 
+pub trait MoveDeltaRecorder {
+    fn record(&mut self, delta: PieceDelta);
+}
+
+pub struct NoDelta;
+impl MoveDeltaRecorder for NoDelta {
+    #[inline(always)]
+    fn record(&mut self, _delta: PieceDelta) {}
+}
+
+impl MoveDeltaRecorder for &mut PiecesDelta {
+    #[inline(always)]
+    fn record(&mut self, delta: PieceDelta) {
+        self.push(delta);
+    }
+}
+
 impl Board {
     pub fn from_fen(fen: &str) -> Result<Board, FenError> {
+        let mut pieces = [Piece::default(); 64];
         let mut hash = 0;
         let mut eval = 0;
 
@@ -169,6 +188,7 @@ impl Board {
                                 [square ^ (56 * !piece.get_color() as usize)]);
 
                     bit_boards.set_piece(square, piece);
+                    pieces[square] = piece;
                     file += 1;
                 }
             }
@@ -225,7 +245,38 @@ impl Board {
 
         hash ^= *SIDE_KEY * !current_color as u64;
 
-        Ok(Self { bit_boards, current_color, castle_flags, last_double, hash, eval })
+        Ok(Self { bit_boards, current_color, castle_flags, last_double, hash, eval, pieces })
+    }
+
+    pub fn piece_at(&self, square: usize) -> Piece {
+        let piece = self.bit_boards.piece_at(square);
+        if piece != self.pieces[square] {
+            Self::print_board(|square| self.bit_boards.piece_at(square));
+            Self::print_board(|square| self.pieces[square]);
+            panic!("mismatch {:?}, {:?}", piece, self.pieces[square]);
+        } else {
+            piece
+        }
+    }
+
+    pub fn print_board(piece_at: impl Fn(usize) -> Piece) {
+        println!("  a b c d e f g h");
+        println!("  ---------------");
+
+        for rank in (0..8).rev() {
+            print!("{}|", rank + 1); // Print rank number
+            for file in 0..8 {
+                let square = rank * 8 + file;
+                let piece = piece_at(square);
+
+                let piece_char = if piece == Piece::Empty { '.' } else { char::from(piece) };
+
+                print!("{} ", piece_char);
+            }
+            println!("|"); // End of row
+        }
+
+        println!("  ---------------");
     }
 
     pub fn is_square_attacked(&self, square: usize, attacker_color: PieceColor) -> bool {
@@ -299,7 +350,7 @@ impl Board {
         self.current_color = !self.current_color;
     }
 
-    pub fn make_move_delta(&mut self, r#move: Move, delta: &mut PiecesDelta) {
+    pub fn make_move(&mut self, r#move: Move, mut delta: impl MoveDeltaRecorder) {
         let (from, to, move_type, piece, capture) = r#move.unpack();
 
         if capture != PieceType::Empty {
@@ -311,13 +362,13 @@ impl Board {
                 + POSITIONAL_SCORES[capture as usize][to ^ (56 * self.current_color as usize)];
 
             if move_type == MoveType::EnPassantCapture {
-                delta.push(PieceDelta {
+                delta.record(PieceDelta {
                     to: 64,
                     from: (to as i32 + if piece == Piece::WhitePawn { -8 } else { 8 }) as u32,
                     piece: Piece::new(capture, !self.current_color),
                 })
             } else {
-                delta.push(PieceDelta {
+                delta.record(PieceDelta {
                     to: 64,
                     from: to as u32,
                     piece: Piece::new(capture, !self.current_color),
@@ -327,11 +378,12 @@ impl Board {
 
         self.bit_boards.set_piece(to, piece);
 
+        self.pieces[to] = piece;
+
         self.hash ^= PIECE_KEYS[piece as usize][to];
 
         if move_type == MoveType::Promote {
-            self.bit_boards
-                .clear_piece(from, Piece::new(PieceType::Pawn, self.current_color));
+            self.bit_boards.clear_piece(from, Piece::new(PieceType::Pawn, self.current_color));
 
             self.hash ^= PIECE_KEYS[Piece::new(PieceType::Pawn, self.current_color) as usize][from];
 
@@ -343,12 +395,12 @@ impl Board {
                 + POSITIONAL_SCORES[piece.get_type() as usize]
                     [to ^ (56 * !self.current_color as usize)];
 
-            delta.push(PieceDelta {
+            delta.record(PieceDelta {
                 to: 64,
                 from: from as u32,
                 piece: Piece::new(PieceType::Pawn, self.current_color),
             });
-            delta.push(PieceDelta { to: to as u32, from: 64, piece });
+            delta.record(PieceDelta { to: to as u32, from: 64, piece });
         } else {
             self.hash ^= PIECE_KEYS[piece as usize][from];
 
@@ -359,8 +411,10 @@ impl Board {
                 - POSITIONAL_SCORES[piece.get_type() as usize]
                     [from ^ (56 * !self.current_color as usize)];
 
-            delta.push(PieceDelta { to: to as u32, from: from as u32, piece });
+            delta.record(PieceDelta { to: to as u32, from: from as u32, piece });
         }
+
+        self.pieces[from] = Piece::Empty;
 
         self.hash ^= CASTLE_KEYS[self.castle_flags.bits() as usize];
         if move_type == MoveType::KingCastle || move_type == MoveType::QueenCastle {
@@ -393,6 +447,9 @@ impl Board {
             self.bit_boards.set_piece(rook_to, rook);
             self.bit_boards.clear_piece(rook_from, rook);
 
+            self.pieces[rook_to] = rook;
+            self.pieces[rook_from] = Piece::Empty;
+
             self.hash ^= PIECE_KEYS[rook as usize][rook_from];
             self.hash ^= PIECE_KEYS[rook as usize][rook_to];
 
@@ -401,7 +458,7 @@ impl Board {
                 - POSITIONAL_SCORES[PieceType::Rook as usize]
                     [rook_from ^ (56 * !self.current_color as usize)];
 
-            delta.push(PieceDelta { to: rook_to as u32, from: rook_from as u32, piece: rook });
+            delta.record(PieceDelta { to: rook_to as u32, from: rook_from as u32, piece: rook });
         }
 
         if piece == Piece::WhiteRook {
@@ -443,151 +500,7 @@ impl Board {
             let captured_piece = Piece::new(PieceType::Pawn, !self.current_color);
             self.bit_boards.clear_piece(captured_pawn_square as usize, captured_piece);
 
-            self.hash ^= PIECE_KEYS[captured_piece as usize][captured_pawn_square as usize];
-            self.hash ^= PIECE_KEYS[captured_piece as usize][to];
-
-            self.eval += POSITIONAL_SCORES[PieceType::Pawn as usize]
-                [captured_pawn_square as usize ^ (56 * self.current_color as usize)]
-                - POSITIONAL_SCORES[PieceType::Pawn as usize]
-                    [to ^ (56 * self.current_color as usize)];
-        }
-
-        self.hash ^= CASTLE_KEYS[self.castle_flags.bits() as usize];
-
-        if let Some(last_double) = self.last_double {
-            self.hash ^= DOUBLE_PUSH_KEYS[last_double as usize];
-        }
-
-        self.last_double = if move_type == MoveType::DoublePush {
-            self.hash ^= DOUBLE_PUSH_KEYS[to];
-            Some(to as u32)
-        } else {
-            None
-        };
-
-        self.eval *= -1;
-        self.hash ^= *SIDE_KEY;
-        self.current_color = !self.current_color;
-    }
-
-    pub fn make_move(&mut self, r#move: Move) {
-        let (from, to, move_type, piece, capture) = r#move.unpack();
-
-        if capture != PieceType::Empty {
-            self.bit_boards.clear_piece(to, Piece::new(capture, !self.current_color));
-
-            self.hash ^= PIECE_KEYS[Piece::new(capture, !self.current_color) as usize][to];
-
-            self.eval += SCORES[capture as usize]
-                + POSITIONAL_SCORES[capture as usize][to ^ (56 * self.current_color as usize)];
-        }
-
-        self.bit_boards.set_piece(to, piece);
-
-        self.hash ^= PIECE_KEYS[piece as usize][to];
-
-        if move_type == MoveType::Promote {
-            self.bit_boards
-                .clear_piece(from, Piece::new(PieceType::Pawn, self.current_color));
-
-            self.hash ^= PIECE_KEYS[Piece::new(PieceType::Pawn, self.current_color) as usize][from];
-
-            self.eval -= SCORES[PieceType::Pawn as usize]
-                + POSITIONAL_SCORES[PieceType::Pawn as usize]
-                    [from ^ (56 * !self.current_color as usize)];
-
-            self.eval += SCORES[piece.get_type() as usize]
-                + POSITIONAL_SCORES[piece.get_type() as usize]
-                    [to ^ (56 * !self.current_color as usize)];
-        } else {
-            self.hash ^= PIECE_KEYS[piece as usize][from];
-
-            self.bit_boards.clear_piece(from, piece);
-
-            self.eval += POSITIONAL_SCORES[piece.get_type() as usize]
-                [to ^ (56 * !self.current_color as usize)]
-                - POSITIONAL_SCORES[piece.get_type() as usize]
-                    [from ^ (56 * !self.current_color as usize)];
-        }
-
-        self.hash ^= CASTLE_KEYS[self.castle_flags.bits() as usize];
-        if move_type == MoveType::KingCastle || move_type == MoveType::QueenCastle {
-            let rook_from = match to {
-                // C1 => A1,
-                2 => 0,
-                // G1 => H1,
-                6 => 7,
-                //C8 => A8,
-                58 => 56,
-                //G8 => H8,
-                62 => 63,
-                _ => panic!("Castle move with invalid to square"),
-            };
-
-            let rook_to = match to {
-                // C1 => D1,
-                2 => 3,
-                // G1 => F1,
-                6 => 5,
-                //C8 => D8,
-                58 => 59,
-                //G8 => F8,
-                62 => 61,
-                _ => panic!("Castle move with invalid to square"),
-            };
-
-            let rook = Piece::new(PieceType::Rook, self.current_color);
-
-            self.bit_boards.set_piece(rook_to, rook);
-            self.bit_boards.clear_piece(rook_from, rook);
-
-            self.hash ^= PIECE_KEYS[rook as usize][rook_from];
-            self.hash ^= PIECE_KEYS[rook as usize][rook_to];
-
-            self.eval += POSITIONAL_SCORES[PieceType::Rook as usize]
-                [rook_to ^ (56 * !self.current_color as usize)]
-                - POSITIONAL_SCORES[PieceType::Rook as usize]
-                    [rook_from ^ (56 * !self.current_color as usize)];
-        }
-
-        if piece == Piece::WhiteRook {
-            if from == 0 {
-                self.castle_flags &= !CastleFlags::WHITE_QUEENSIDE_CASTLING;
-            } else if from == 7 {
-                self.castle_flags &= !CastleFlags::WHITE_KINGSIDE_CASTLING;
-            }
-        } else if piece == Piece::BlackRook {
-            if from == 56 {
-                self.castle_flags &= !CastleFlags::BLACK_QUEENSIDE_CASTLING;
-            } else if from == 63 {
-                self.castle_flags &= !CastleFlags::BLACK_KINGSIDE_CASTLING;
-            }
-        }
-
-        if piece == Piece::WhiteKing {
-            self.castle_flags &=
-                !(CastleFlags::WHITE_KINGSIDE_CASTLING | CastleFlags::WHITE_QUEENSIDE_CASTLING);
-        } else if piece == Piece::BlackKing {
-            self.castle_flags &=
-                !(CastleFlags::BLACK_KINGSIDE_CASTLING | CastleFlags::BLACK_QUEENSIDE_CASTLING);
-        }
-
-        if capture == PieceType::Rook {
-            match to {
-                0 => self.castle_flags &= !CastleFlags::WHITE_QUEENSIDE_CASTLING,
-                7 => self.castle_flags &= !CastleFlags::WHITE_KINGSIDE_CASTLING,
-                56 => self.castle_flags &= !CastleFlags::BLACK_QUEENSIDE_CASTLING,
-                63 => self.castle_flags &= !CastleFlags::BLACK_KINGSIDE_CASTLING,
-                _ => {}
-            }
-        }
-
-        // Handle en passant capture
-        if move_type == MoveType::EnPassantCapture {
-            let captured_pawn_square = to as i32 + if piece == Piece::WhitePawn { -8 } else { 8 };
-
-            let captured_piece = Piece::new(PieceType::Pawn, !self.current_color);
-            self.bit_boards.clear_piece(captured_pawn_square as usize, captured_piece);
+            self.pieces[captured_pawn_square as usize] = Piece::Empty;
 
             self.hash ^= PIECE_KEYS[captured_piece as usize][captured_pawn_square as usize];
             self.hash ^= PIECE_KEYS[captured_piece as usize][to];
@@ -624,7 +537,7 @@ impl Board {
 #[cfg(test)]
 mod tests {
 
-    use std::{sync::Mutex, time::Instant};
+    use std::time::Instant;
 
     use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
@@ -633,7 +546,7 @@ mod tests {
         movegen::generate_moves,
         r#move::MoveType,
         scores::{POSITIONAL_SCORES, SCORES},
-        PieceColor,
+        PieceColor, PiecesDelta,
     };
 
     use super::Board;
@@ -678,7 +591,7 @@ mod tests {
         let mut pieces = board.bit_boards.occupancy();
         while pieces != 0 {
             let square = pieces.trailing_zeros() as usize;
-            let piece = board.bit_boards.piece_at(square);
+            let piece = board.piece_at(square);
 
             hash ^= PIECE_KEYS[piece as usize][square];
             pieces &= pieces - 1;
@@ -700,7 +613,7 @@ mod tests {
         let mut pieces = board.bit_boards.occupancy();
         while pieces != 0 {
             let square = pieces.trailing_zeros() as usize;
-            let piece = board.bit_boards.piece_at(square);
+            let piece = board.piece_at(square);
 
             eval += if piece.get_color() == board.current_color { 1 } else { -1 }
                 * (SCORES[piece.get_type() as usize]
@@ -714,44 +627,48 @@ mod tests {
     }
 
     pub fn par_perft(board: &Board, depth: u32) -> u64 {
-        let nodes = Mutex::new(0);
         let moves = generate_moves(board);
 
-        moves.par_iter().for_each(|&r#move| {
-            let mut new_board = board.clone();
+        let nodes = moves
+            .par_iter()
+            .map(|&r#move| {
+                let mut new_board = board.clone();
 
-            new_board.make_move(r#move);
-            if new_board.is_king_attacked(board.current_color) {
-                return;
-            }
-
-            if r#move.move_type() == MoveType::KingCastle {
-                let castle_target = if board.current_color == PieceColor::White { 5 } else { 61 };
-                if new_board.is_square_attacked(castle_target, new_board.current_color) {
-                    return;
+                let mut delta = PiecesDelta::new();
+                new_board.make_move(r#move, &mut delta);
+                if new_board.is_king_attacked(board.current_color) {
+                    return 0;
                 }
 
-                if board.is_king_attacked(board.current_color) {
-                    return;
-                }
-            } else if r#move.move_type() == MoveType::QueenCastle {
-                let castle_target = if board.current_color == PieceColor::White { 3 } else { 59 };
-                if new_board.is_square_attacked(castle_target, new_board.current_color) {
-                    return;
-                }
-                if board.is_king_attacked(board.current_color) {
-                    return;
-                }
-            }
+                if r#move.move_type() == MoveType::KingCastle {
+                    let castle_target =
+                        if board.current_color == PieceColor::White { 5 } else { 61 };
+                    if new_board.is_square_attacked(castle_target, new_board.current_color) {
+                        return 0;
+                    }
 
-            let result = perft_helper(new_board, depth - 1);
-            println!("{} {}", r#move, result);
-            *nodes.lock().unwrap() += result;
-        });
+                    if board.is_king_attacked(board.current_color) {
+                        return 0;
+                    }
+                } else if r#move.move_type() == MoveType::QueenCastle {
+                    let castle_target =
+                        if board.current_color == PieceColor::White { 3 } else { 59 };
+                    if new_board.is_square_attacked(castle_target, new_board.current_color) {
+                        return 0;
+                    }
+                    if board.is_king_attacked(board.current_color) {
+                        return 0;
+                    }
+                }
 
-        let result = *nodes.lock().unwrap();
-        println!("\n{}", result);
-        result
+                let result = perft_helper(new_board, depth - 1);
+                println!("{} {}", r#move, result);
+                result
+            })
+            .sum();
+
+        println!("\n{}", nodes);
+        nodes
     }
 
     fn perft_helper(board: Board, depth: u32) -> u64 {
@@ -762,35 +679,36 @@ mod tests {
         let moves = generate_moves(&board);
 
         let mut nodes = 0;
-        moves.iter().for_each(|&r#move| {
+        for r#move in moves {
             let mut new_board = board.clone();
 
-            new_board.make_move(r#move);
+            let mut delta = PiecesDelta::new();
+            new_board.make_move(r#move, &mut delta);
             if new_board.is_king_attacked(board.current_color) {
-                return;
+                continue;
             }
 
             if r#move.move_type() == MoveType::KingCastle {
                 let castle_target = if board.current_color == PieceColor::White { 5 } else { 61 };
                 if new_board.is_square_attacked(castle_target, new_board.current_color) {
-                    return;
+                    continue;
                 }
                 if board.is_king_attacked(board.current_color) {
-                    return;
+                    continue;
                 }
             } else if r#move.move_type() == MoveType::QueenCastle {
                 let castle_target = if board.current_color == PieceColor::White { 3 } else { 59 };
                 if new_board.is_square_attacked(castle_target, new_board.current_color) {
-                    return;
+                    continue;
                 }
                 if board.is_king_attacked(board.current_color) {
-                    return;
+                    continue;
                 }
             }
 
             let result = perft_helper(new_board, depth - 1);
             nodes += result;
-        });
+        }
 
         nodes
     }

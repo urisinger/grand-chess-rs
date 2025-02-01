@@ -174,7 +174,7 @@ where
 
     pub fn make_move(&mut self, r#move: Move, board: &mut Board, ply: usize) {
         let mut delta = PiecesDelta::new();
-        board.make_move_delta(r#move, &mut delta);
+        board.make_move(r#move, &mut delta);
 
         let needs_refresh = SET::needs_refresh(r#move);
 

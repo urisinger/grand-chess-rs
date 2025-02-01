@@ -23,6 +23,15 @@ pub struct Moves {
     len: usize,
 }
 
+impl IntoIterator for Moves {
+    type Item = Move;
+    type IntoIter = std::iter::Take<std::array::IntoIter<Move, 256>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.moves.into_iter().take(self.len)
+    }
+}
+
 impl Deref for Moves {
     type Target = [Move];
     fn deref(&self) -> &Self::Target {
@@ -54,6 +63,7 @@ impl Default for Moves {
 impl Moves {
     pub fn push(&mut self, r#move: Move) {
         assert!(self.len < 256);
+
         self.moves[self.len] = r#move;
         self.len += 1;
     }
@@ -394,12 +404,12 @@ fn generate_sliding_captures(
 
 #[inline]
 fn generate_piece_moves(board: &Board, moves: &mut Moves, square: usize, mut attacks: u64) {
-    let piece = board.bit_boards.piece_at(square);
+    let piece = board.piece_at(square);
 
     while attacks != 0 {
         let attack = attacks.trailing_zeros();
 
-        let capture = board.bit_boards.piece_at(attack as usize).get_type();
+        let capture = board.piece_at(attack as usize).get_type();
         moves.push(Move::new(
             square as u32,
             attack,
@@ -508,7 +518,7 @@ fn generate_pawn_moves(board: &Board, moves: &mut Moves) {
 
         let promotion_rank = if is_white { 7 } else { 0 };
 
-        let captured_piece = board.bit_boards.piece_at(target_square as usize).get_type();
+        let captured_piece = board.piece_at(target_square as usize).get_type();
 
         if target_square / 8 == promotion_rank {
             moves.push(Move::new(
@@ -558,7 +568,7 @@ fn generate_pawn_moves(board: &Board, moves: &mut Moves) {
 
         let promotion_rank = if is_white { 7 } else { 0 };
 
-        let captured_piece = board.bit_boards.piece_at(target_square as usize).get_type();
+        let captured_piece = board.piece_at(target_square as usize).get_type();
 
         if target_square / 8 == promotion_rank {
             moves.push(Move::new(
@@ -663,7 +673,7 @@ fn generate_pawn_captures(board: &Board, moves: &mut Moves) {
 
         let promotion_rank = if is_white { 7 } else { 0 };
 
-        let captured_piece = board.bit_boards.piece_at(target_square as usize).get_type();
+        let captured_piece = board.piece_at(target_square as usize).get_type();
 
         if target_square / 8 == promotion_rank {
             moves.push(Move::new(
@@ -713,7 +723,7 @@ fn generate_pawn_captures(board: &Board, moves: &mut Moves) {
 
         let promotion_rank = if is_white { 7 } else { 0 };
 
-        let captured_piece = board.bit_boards.piece_at(target_square as usize).get_type();
+        let captured_piece = board.piece_at(target_square as usize).get_type();
 
         if target_square / 8 == promotion_rank {
             moves.push(Move::new(
