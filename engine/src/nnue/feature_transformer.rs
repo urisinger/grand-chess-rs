@@ -48,39 +48,52 @@ where
         for c in 0..=1 {
             let offset = if prespectives[c] == PieceColor::White { 0 } else { 1 } * OUT / 2;
 
-            const IN_REGISTER_WIDTH: usize = 256 / 16;
-            const OUT_REGISTER_WIDTH: usize = 256 / 8;
-            assert!(OUT % OUT_REGISTER_WIDTH == 0, "We're processing 32 elements at a time");
-            let num_of_chunks: usize = (OUT / 2) / OUT_REGISTER_WIDTH;
+            if cfg!(target_feature = "avx2") {
+                const IN_REGISTER_WIDTH: usize = 256 / 16;
+                const OUT_REGISTER_WIDTH: usize = 256 / 8;
+                assert!(OUT % OUT_REGISTER_WIDTH == 0, "We're processing 32 elements at a time");
+                let num_of_chunks: usize = (OUT / 2) / OUT_REGISTER_WIDTH;
 
-            let zero = unsafe { _mm256_setzero_si256() };
-            const CONTROL: i32 = 0b11011000;
+                let zero = unsafe { _mm256_setzero_si256() };
+                const CONTROL: i32 = 0b11011000;
 
-            for i in 0..num_of_chunks {
-                unsafe {
-                    let in0 = _mm256_loadu_si256(
-                        &acc.accumulators[offset + (i * 2 + 0) * IN_REGISTER_WIDTH] as *const i16
-                            as *const _,
-                    );
-                    let in1 = _mm256_loadu_si256(
-                        &acc.accumulators[offset + (i * 2 + 1) * IN_REGISTER_WIDTH] as *const i16
-                            as *const _,
-                    );
+                for i in 0..num_of_chunks {
+                    unsafe {
+                        let in0 = _mm256_loadu_si256(
+                            &acc.accumulators[offset + (i * 2 + 0) * IN_REGISTER_WIDTH]
+                                as *const i16 as *const _,
+                        );
+                        let in1 = _mm256_loadu_si256(
+                            &acc.accumulators[offset + (i * 2 + 1) * IN_REGISTER_WIDTH]
+                                as *const i16 as *const _,
+                        );
 
-                    let result = _mm256_permute4x64_epi64(
-                        _mm256_max_epi8(_mm256_packs_epi16(in0, in1), zero),
-                        CONTROL,
-                    );
+                        let result = _mm256_permute4x64_epi64(
+                            _mm256_max_epi8(_mm256_packs_epi16(in0, in1), zero),
+                            CONTROL,
+                        );
 
-                    _mm256_storeu_si256(
-                        &mut output[c * OUT / 2 + i * OUT_REGISTER_WIDTH] as *mut i8 as *mut _,
-                        result,
-                    );
+                        _mm256_storeu_si256(
+                            &mut output[c * OUT / 2 + i * OUT_REGISTER_WIDTH] as *mut i8 as *mut _,
+                            result,
+                        );
+                    }
+                }
+            } else {
+                for i in 0..OUT / 2 {
+                    let val_i16 = acc.accumulators[offset + i];
+
+                    // Saturate/clamp the value from i16 (-32768 to 32767) to i8 (-128 to 127)
+                    let clamped_val = val_i16.clamp(-128, 127) as i8;
+
+                    // Store in the output buffer
+                    output[c * OUT / 2 + i] = clamped_val;
                 }
             }
         }
     }
 
+    #[cfg(target_feature = "avx2")]
     pub fn refresh(
         &self,
         acc: &mut Accumulator<i16, OUT>,
@@ -131,6 +144,28 @@ where
                         regs[j],
                     );
                 }
+            }
+        }
+    }
+
+    #[cfg(not(target_feature = "avx2"))]
+    pub fn refresh(
+        &self,
+        acc: &mut Accumulator<i16, OUT>,
+        features: &[usize],
+        perspective: PieceColor,
+    ) {
+        let offset = if perspective == PieceColor::White { 0 } else { 1 } * OUT / 2;
+
+        // Step 1: Copy bias into accumulator
+        for i in 0..OUT / 2 {
+            acc.accumulators[offset + i] = self.bias[i];
+        }
+
+        // Step 2: Accumulate weights for active features
+        for &feature in features {
+            for i in 0..OUT / 2 {
+                acc.accumulators[offset + i] += self.weights[feature][i];
             }
         }
     }

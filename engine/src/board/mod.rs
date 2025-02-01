@@ -249,14 +249,7 @@ impl Board {
     }
 
     pub fn piece_at(&self, square: usize) -> Piece {
-        let piece = self.bit_boards.piece_at(square);
-        if piece != self.pieces[square] {
-            Self::print_board(|square| self.bit_boards.piece_at(square));
-            Self::print_board(|square| self.pieces[square]);
-            panic!("mismatch {:?}, {:?}", piece, self.pieces[square]);
-        } else {
-            piece
-        }
+        self.pieces[square]
     }
 
     pub fn print_board(piece_at: impl Fn(usize) -> Piece) {

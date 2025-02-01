@@ -13,6 +13,7 @@ use super::Layer;
 pub struct ReluLayer<I, O, const N: usize>(PhantomData<I>, PhantomData<O>);
 
 impl<const N: usize> Layer<i32, i8, N, N> for ReluLayer<i32, i8, N> {
+    #[cfg(target_feature = "avx2")]
     fn propagate(&self, input: &[i32; N], output: &mut [i8; N]) {
         const IN_REGISTER_WIDTH: usize = 256 / 32;
         const OUT_REGISTER_WIDTH: usize = 256 / 8;
@@ -55,11 +56,12 @@ impl<const N: usize> Layer<i32, i8, N, N> for ReluLayer<i32, i8, N> {
         }
     }
 
-    /*fn propagate(&self, input: &[i32; N], output: &mut [i8; N]) {
+    #[cfg(not(target_feature = "avx2"))]
+    fn propagate(&self, input: &[i32; N], output: &mut [i8; N]) {
         for i in 0..N {
             output[i] = (input[i] >> 6).min(127).max(0) as i8;
         }
-    }*/
+    }
 
     fn get_hash(prev_hash: u32) -> u32 {
         0x538D24C7u32.overflowing_add(prev_hash).0

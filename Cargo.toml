@@ -11,8 +11,7 @@ engine = {path = "engine/"}
 uci = {path = "uci/"}
 
 [profile.dev]
-opt-level = 0 # No optimization
-debug = true  # Include debug symbols
+opt-level = 2
 
 [profile.release]
 lto = "fat"

@@ -38,88 +38,88 @@ where
         hash_value
     }
 
+    #[cfg(target_feature = "avx2")]
     fn propagate(&self, input: &[i8; I], output: &mut [i32; O]) {
-        if cfg!(target_arch = "x86_64") {
-            if O == 1 {
-                let mut sum = self.bias[0];
-                for j in 0..I {
-                    sum += input[j] as i32 * self.weights[j] as i32;
-                }
+        if O == 1 {
+            let mut sum = self.bias[0];
+            for j in 0..I {
+                sum += input[j] as i32 * self.weights[j] as i32;
+            }
 
-                output[0] = sum;
-            } else {
-                const REGISTER_WIDTH: usize = 256 / 8;
-                assert!(I % REGISTER_WIDTH == 0, "Were proccesing 32 elements at a time");
-                assert!(O % 4 == 0, "We unroll 4 at a time");
+            output[0] = sum;
+        } else {
+            const REGISTER_WIDTH: usize = 256 / 8;
+            assert!(I % REGISTER_WIDTH == 0, "Were proccesing 32 elements at a time");
+            assert!(O % 4 == 0, "We unroll 4 at a time");
 
-                let num_in_chunks: usize = I / REGISTER_WIDTH;
-                let num_out_chunks: usize = O / 4;
+            let num_in_chunks: usize = I / REGISTER_WIDTH;
+            let num_out_chunks: usize = O / 4;
 
-                for i in 0..num_out_chunks {
-                    unsafe {
-                        let mut sum0 = _mm256_setzero_si256();
-                        let mut sum1 = _mm256_setzero_si256();
-                        let mut sum2 = _mm256_setzero_si256();
-                        let mut sum3 = _mm256_setzero_si256();
+            for i in 0..num_out_chunks {
+                unsafe {
+                    let mut sum0 = _mm256_setzero_si256();
+                    let mut sum1 = _mm256_setzero_si256();
+                    let mut sum2 = _mm256_setzero_si256();
+                    let mut sum3 = _mm256_setzero_si256();
 
-                        for j in 0..num_in_chunks {
-                            let input = _mm256_loadu_si256(
-                                &input[j * REGISTER_WIDTH] as *const i8 as *const _,
-                            );
+                    for j in 0..num_in_chunks {
+                        let input =
+                            _mm256_loadu_si256(&input[j * REGISTER_WIDTH] as *const i8 as *const _);
 
-                            mm256_dpbusd_epi32(
-                                &mut sum0,
-                                input,
-                                _mm256_loadu_si256(
-                                    &self.weights[(i * 4 + 0) * I + j * REGISTER_WIDTH] as *const i8
-                                        as *const _,
-                                ),
-                            );
+                        mm256_dpbusd_epi32(
+                            &mut sum0,
+                            input,
+                            _mm256_loadu_si256(
+                                &self.weights[(i * 4 + 0) * I + j * REGISTER_WIDTH] as *const i8
+                                    as *const _,
+                            ),
+                        );
 
-                            mm256_dpbusd_epi32(
-                                &mut sum1,
-                                input,
-                                _mm256_loadu_si256(
-                                    &self.weights[(i * 4 + 1) * I + j * REGISTER_WIDTH] as *const i8
-                                        as *const _,
-                                ),
-                            );
-                            mm256_dpbusd_epi32(
-                                &mut sum2,
-                                input,
-                                _mm256_loadu_si256(
-                                    &self.weights[(i * 4 + 2) * I + j * REGISTER_WIDTH] as *const i8
-                                        as *const _,
-                                ),
-                            );
-                            mm256_dpbusd_epi32(
-                                &mut sum3,
-                                input,
-                                _mm256_loadu_si256(
-                                    &self.weights[(i * 4 + 3) * I + j * REGISTER_WIDTH] as *const i8
-                                        as *const _,
-                                ),
-                            );
-                        }
-
-                        let bias = _mm_loadu_si128(&self.bias[i * 4] as *const i32 as *const _);
-
-                        _mm_storeu_si128(
-                            &mut output[i * 4] as *mut i32 as *mut _,
-                            m256_haddx4(sum0, sum1, sum2, sum3, bias),
+                        mm256_dpbusd_epi32(
+                            &mut sum1,
+                            input,
+                            _mm256_loadu_si256(
+                                &self.weights[(i * 4 + 1) * I + j * REGISTER_WIDTH] as *const i8
+                                    as *const _,
+                            ),
+                        );
+                        mm256_dpbusd_epi32(
+                            &mut sum2,
+                            input,
+                            _mm256_loadu_si256(
+                                &self.weights[(i * 4 + 2) * I + j * REGISTER_WIDTH] as *const i8
+                                    as *const _,
+                            ),
+                        );
+                        mm256_dpbusd_epi32(
+                            &mut sum3,
+                            input,
+                            _mm256_loadu_si256(
+                                &self.weights[(i * 4 + 3) * I + j * REGISTER_WIDTH] as *const i8
+                                    as *const _,
+                            ),
                         );
                     }
-                }
-            }
-        } else {
-            for i in 0..O {
-                let mut sum = self.bias[i];
-                for j in 0..I {
-                    sum += input[j] as i32 * self.weights[i * I + j] as i32;
-                }
 
-                output[i] = sum;
+                    let bias = _mm_loadu_si128(&self.bias[i * 4] as *const i32 as *const _);
+
+                    _mm_storeu_si128(
+                        &mut output[i * 4] as *mut i32 as *mut _,
+                        m256_haddx4(sum0, sum1, sum2, sum3, bias),
+                    );
+                }
             }
+        }
+    }
+    #[cfg(not(target_feature = "avx2"))]
+    fn propagate(&self, input: &[i8; I], output: &mut [i32; O]) {
+        for i in 0..O {
+            let mut sum = self.bias[i];
+            for j in 0..I {
+                sum += input[j] as i32 * self.weights[i * I + j] as i32;
+            }
+
+            output[i] = sum;
         }
     }
 }

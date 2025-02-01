@@ -1,7 +1,5 @@
 [build]
-rustflags = [
-  "-Ctarget-cpu=native",
-]
+rustflags = ["-C", "target-feature=+avx2"]
 
 [env]
 EVALFILE="nn-62ef826d1a6d.nnue"

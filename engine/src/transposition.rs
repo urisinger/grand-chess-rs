@@ -1,4 +1,4 @@
-use std::mem::{size_of, transmute};
+use std::mem::size_of;
 
 use crate::board::{
     piece::PieceType,
