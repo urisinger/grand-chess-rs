@@ -131,7 +131,6 @@ where
 
         let mut buf = vec![0u8; size];
         r.read_exact(&mut buf).unwrap();
-        let str = String::from_utf8(buf).unwrap();
 
         let hash = r.read_u32::<LittleEndian>().unwrap();
 

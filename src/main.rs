@@ -4,13 +4,9 @@ use std::{
     io::{self, BufReader},
 };
 
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-use engine::{
-    board::{movegen::generate_moves, piece::PieceColor, r#move::MoveType, Board, PiecesDelta},
-    GrandChessEngine,
-};
-use uci::{UciConnection, UciMove};
+use engine::GrandChessEngine;
+use uci::UciConnection;
 
 pub fn main() {
     let mut args = env::args();
