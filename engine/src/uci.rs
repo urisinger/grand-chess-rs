@@ -19,6 +19,7 @@ use uci::{Engine, RecivedMessage};
 use super::{GrandChessEngine, MATE_SCORE, MATE_VALUE, MAX_PLY, MAX_SCORE, MIN_SCORE};
 
 const VAL_WINDOW: i32 = 50;
+const MEGABYTE: usize = 0x100000;
 
 impl Engine for GrandChessEngine {
     fn go(
@@ -199,8 +200,8 @@ impl Engine for GrandChessEngine {
 
     fn set_option(&mut self, name: &str, value: Option<&str>) {
         match name {
-            "Hash" => self.tt.resize(match value.unwrap_or("1").parse() {
-                Ok(num) => num,
+            "Hash" => self.tt.resize(match value.unwrap_or("1").parse::<usize>() {
+                Ok(num) => num * MEGABYTE,
                 Err(e) => {
                     eprintln!("could not parse option due to error: {}", e);
                     return;
