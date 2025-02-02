@@ -115,15 +115,15 @@
     ],
     "stats": {
         "Engine2 vs grand-chess": {
-            "wins": 15,
-            "losses": 106,
-            "draws": 59,
+            "wins": 16,
+            "losses": 117,
+            "draws": 67,
             "penta_WW": 0,
             "penta_WD": 3,
-            "penta_WL": 12,
-            "penta_DD": 12,
-            "penta_LD": 32,
-            "penta_LL": 31
+            "penta_WL": 13,
+            "penta_DD": 15,
+            "penta_LD": 34,
+            "penta_LL": 35
         },
         "grand-chess vs Engine2": {
             "wins": 0,

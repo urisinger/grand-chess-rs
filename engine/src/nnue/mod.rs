@@ -117,7 +117,7 @@ where
     }
 
     pub fn load(&mut self, r: &mut impl Read) {
-        let version = r.read_i32::<LittleEndian>().unwrap();
+        _ = r.read_i32::<LittleEndian>().unwrap();
         let kp_hash: u32 = SET::hash() ^ NET_IN as u32;
         let correct_hash = kp_hash ^ NET::hash();
 

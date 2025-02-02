@@ -45,7 +45,7 @@ pub enum EngineCommand {
         value: Option<String>,
     },
 }
-
+#[allow(clippy::large_enum_variant)]
 pub enum RecivedMessage {
     BestMove(UciMove),
     Info(Vec<UciInfoAttribute>),
@@ -100,7 +100,7 @@ impl<W: Write, E: 'static + Engine + Send> UciConnection<W, E> {
 
         let input_thread = thread::spawn(move || {
             for line in reader.lines() {
-                if let Err(_) = input_sender.send(RecivedMessage::Uci(parse_one(&line.unwrap()))) {
+                if input_sender.send(RecivedMessage::Uci(parse_one(&line.unwrap()))).is_err() {
                     break;
                 }
             }
@@ -150,10 +150,7 @@ impl<W: Write, E: 'static + Engine + Send> UciConnection<W, E> {
                     }
                     UciMessage::UciNewGame => {
                         _ = self.engine_sender.send(EngineCommand::NewGame);
-                        _ = self
-                            .writer
-                            .write_fmt(format_args!("{}\n", UciMessage::ReadyOk))
-                            .unwrap();
+                        self.writer.write_fmt(format_args!("{}\n", UciMessage::ReadyOk)).unwrap();
                     }
                     UciMessage::SetOption { name, value } => {
                         _ = self.engine_sender.send(EngineCommand::SetOption { name, value })
@@ -165,13 +162,10 @@ impl<W: Write, E: 'static + Engine + Send> UciConnection<W, E> {
                         return;
                     }
                     UciMessage::Unknown(s, err) => {
-                        _ = self
-                            .writer
-                            .write_fmt(format_args!("Uknown uci command: {}\n", s))
-                            .unwrap();
+                        self.writer.write_fmt(format_args!("Uknown uci command: {}\n", s)).unwrap();
 
                         if let Some(err) = err {
-                            _ = self.writer.write_fmt(format_args!("{}\n", err)).unwrap();
+                            self.writer.write_fmt(format_args!("{}\n", err)).unwrap();
                         }
                     }
                     _ => {}

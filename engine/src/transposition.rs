@@ -57,7 +57,8 @@ impl THash {
     pub fn from_u128(board: &Board, val: u128) -> Self {
         let from = ((val >> 113) & 0x3f) as u32;
         let to = ((val >> 119) & 0x3f) as u32;
-        let move_type: MoveType = unsafe { std::mem::transmute(((val >> 125) & 0x7) as u8) };
+        let move_type: MoveType =
+            unsafe { std::mem::transmute::<u8, MoveType>(((val >> 125) & 0x7) as u8) };
 
         let piece = board.piece_at(from as usize);
         let captured = board.piece_at(to as usize);
@@ -71,7 +72,7 @@ impl THash {
             key: (val & 0xffffffffffffffff) as u64,   // Bits 0–63
             depth: ((val >> 64) & 0x7fff) as i32,     // Bits 64–78 (15 bits)
             score: ((val >> 79) & 0xffffffff) as i32, // Bits 79–110 (32 bits)
-            flags: unsafe { std::mem::transmute(((val >> 111) & 0b11) as u8) }, // Bits 111–112 (2 bits)
+            flags: unsafe { std::mem::transmute::<u8, HashFlags>(((val >> 111) & 0b11) as u8) }, // Bits 111–112 (2 bits)
 
             best_move: Move::new(from, to, move_type, piece, captured),
         }
