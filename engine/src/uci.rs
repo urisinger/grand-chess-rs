@@ -219,7 +219,6 @@ impl Engine for GrandChessEngine {
             self.board.make_move(parsed_move, NoDelta);
             self.ply_offset += 1;
         }
-        self.board.print_board();
     }
 
     fn new_game(&mut self) {
