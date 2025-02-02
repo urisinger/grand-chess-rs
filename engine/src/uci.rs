@@ -301,7 +301,6 @@ pub fn parse_move(board: &Board, uci_move: UciMove) -> Move {
             && uci_move.to.rank == 3
             && (uci_move.to.file as u8).abs_diff(uci_move.from.file as u8) == 1
         {
-            println!("got en passent");
             if board.piece_at(to + 8).get_type() == PieceType::Pawn {
                 return Move::new(
                     from as u32,

@@ -15,20 +15,11 @@ use uci::{UciConnection, UciMove};
 pub fn main() {
     let mut args = env::args();
     args.next();
+
     match args.next().as_deref() {
         Some("bench") => {
             let mut engine = GrandChessEngine::new(1000000);
-            engine.bench(&BENCHES, 10);
-        }
-        Some("perft") => {
-            let fen = args.next().expect("expected fen arg as second arg");
-            let depth: u32 = args
-                .next()
-                .expect("expected depth arg as third arg")
-                .parse()
-                .expect("expected depth to be number");
-            let board = Board::from_fen(&fen).unwrap();
-            perft(&board, depth);
+            engine.bench(&BENCHES, 8);
         }
         _ => {
             let connection = UciConnection::new(
@@ -40,91 +31,6 @@ pub fn main() {
             connection.run();
         }
     }
-}
-
-pub fn perft(board: &Board, depth: u32) -> u64 {
-    let moves = generate_moves(board);
-
-    let nodes = moves
-        .par_iter()
-        .map(|&r#move| {
-            let mut new_board = board.clone();
-
-            let mut delta = PiecesDelta::new();
-            new_board.make_move(r#move, &mut delta);
-            if new_board.is_king_attacked(board.current_color) {
-                return 0;
-            }
-
-            if r#move.move_type() == MoveType::KingCastle {
-                let castle_target = if board.current_color == PieceColor::White { 5 } else { 61 };
-                if new_board.is_square_attacked(castle_target, new_board.current_color) {
-                    return 0;
-                }
-
-                if board.is_king_attacked(board.current_color) {
-                    return 0;
-                }
-            } else if r#move.move_type() == MoveType::QueenCastle {
-                let castle_target = if board.current_color == PieceColor::White { 3 } else { 59 };
-                if new_board.is_square_attacked(castle_target, new_board.current_color) {
-                    return 0;
-                }
-                if board.is_king_attacked(board.current_color) {
-                    return 0;
-                }
-            }
-
-            let result = perft_helper(new_board, depth - 1);
-            println!("{} - {}", r#move, result);
-            result
-        })
-        .sum();
-
-    println!("\n{}", nodes);
-    nodes
-}
-
-fn perft_helper(board: Board, depth: u32) -> u64 {
-    if depth <= 0 {
-        return 1;
-    }
-
-    let moves = generate_moves(&board);
-
-    let mut nodes = 0;
-    for r#move in moves {
-        let mut new_board = board.clone();
-
-        let mut delta = PiecesDelta::new();
-        new_board.make_move(r#move, &mut delta);
-        if new_board.is_king_attacked(board.current_color) {
-            continue;
-        }
-
-        if r#move.move_type() == MoveType::KingCastle {
-            let castle_target = if board.current_color == PieceColor::White { 5 } else { 61 };
-            if new_board.is_square_attacked(castle_target, new_board.current_color) {
-                continue;
-            }
-            if board.is_king_attacked(board.current_color) {
-                continue;
-            }
-        } else if r#move.move_type() == MoveType::QueenCastle {
-            let castle_target = if board.current_color == PieceColor::White { 3 } else { 59 };
-            if new_board.is_square_attacked(castle_target, new_board.current_color) {
-                continue;
-            }
-            if board.is_king_attacked(board.current_color) {
-                continue;
-            }
-        }
-
-        let result = perft_helper(new_board, depth - 1);
-        nodes += result;
-    }
-
-    nodes
 }
 
 static BENCHES: [&str; 26] = [

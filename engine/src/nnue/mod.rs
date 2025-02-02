@@ -118,7 +118,6 @@ where
 
     pub fn load(&mut self, r: &mut impl Read) {
         let version = r.read_i32::<LittleEndian>().unwrap();
-        println!("version: 0x{:x}", version);
         let kp_hash: u32 = SET::hash() ^ NET_IN as u32;
         let correct_hash = kp_hash ^ NET::hash();
 
@@ -133,8 +132,6 @@ where
         let mut buf = vec![0u8; size];
         r.read_exact(&mut buf).unwrap();
         let str = String::from_utf8(buf).unwrap();
-
-        println!("Network description is: {}", str);
 
         let hash = r.read_u32::<LittleEndian>().unwrap();
 
@@ -151,8 +148,6 @@ where
         );
 
         self.net.load(r);
-
-        println!("network loaded");
     }
 
     pub fn refresh_board(&mut self, board: &Board, ply: usize) {

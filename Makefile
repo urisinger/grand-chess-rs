@@ -1,4 +1,4 @@
 EXE = GrandChess
 
 all:
-	cargo rustc --release -- --emit link=$(EXE)
+	RUSTFLAGS="-Ctarget-cpu=native" cargo rustc --release -- --emit link=$(EXE)
