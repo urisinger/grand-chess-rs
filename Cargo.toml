@@ -9,6 +9,7 @@ edition = "2021"
 [dependencies]
 engine = {path = "engine/"} 
 uci = {path = "uci/"}
+rayon = "1.1"
 
 [profile.dev]
 opt-level = 2

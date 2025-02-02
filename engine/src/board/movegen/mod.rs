@@ -89,6 +89,7 @@ pub fn generate_moves(board: &Board) -> Moves {
             board,
             &mut moves,
             square,
+            Piece::new(PieceType::Knight, board.current_color),
             KNIGHT_ATTACKS[square] & !board.bit_boards.col_occupancy(board.current_color),
         );
 
@@ -154,6 +155,7 @@ pub fn generate_moves(board: &Board) -> Moves {
                 board,
                 &mut moves,
                 square as usize,
+                Piece::new(PieceType::King, board.current_color),
                 KING_ATTACKS[square as usize]
                     & !board.bit_boards.col_occupancy(board.current_color),
             );
@@ -168,6 +170,7 @@ pub fn generate_moves(board: &Board) -> Moves {
             board,
             &mut moves,
             square,
+            Piece::new(PieceType::Bishop, board.current_color),
             BISHOP_MASKS[square],
             BISHOP_MAGICS[square],
             &BISHOP_ATTACKS[square],
@@ -184,6 +187,7 @@ pub fn generate_moves(board: &Board) -> Moves {
             board,
             &mut moves,
             square,
+            Piece::new(PieceType::Rook, board.current_color),
             ROOK_MASKS[square],
             ROOK_MAGICS[square],
             &ROOK_ATTACKS[square],
@@ -200,6 +204,7 @@ pub fn generate_moves(board: &Board) -> Moves {
             board,
             &mut moves,
             square,
+            Piece::new(PieceType::Queen, board.current_color),
             ROOK_MASKS[square],
             ROOK_MAGICS[square],
             &ROOK_ATTACKS[square],
@@ -208,6 +213,7 @@ pub fn generate_moves(board: &Board) -> Moves {
             board,
             &mut moves,
             square,
+            Piece::new(PieceType::Queen, board.current_color),
             BISHOP_MASKS[square],
             BISHOP_MAGICS[square],
             &BISHOP_ATTACKS[square],
@@ -230,6 +236,7 @@ pub fn generate_captures(board: &Board) -> Moves {
             board,
             &mut moves,
             square,
+            Piece::new(PieceType::Bishop, board.current_color),
             BISHOP_MASKS[square],
             BISHOP_MAGICS[square],
             &BISHOP_ATTACKS[square],
@@ -246,6 +253,7 @@ pub fn generate_captures(board: &Board) -> Moves {
             board,
             &mut moves,
             square,
+            Piece::new(PieceType::Rook, board.current_color),
             ROOK_MASKS[square],
             ROOK_MAGICS[square],
             &ROOK_ATTACKS[square],
@@ -262,6 +270,7 @@ pub fn generate_captures(board: &Board) -> Moves {
             board,
             &mut moves,
             square,
+            Piece::new(PieceType::Queen, board.current_color),
             ROOK_MASKS[square],
             ROOK_MAGICS[square],
             &ROOK_ATTACKS[square],
@@ -270,6 +279,7 @@ pub fn generate_captures(board: &Board) -> Moves {
             board,
             &mut moves,
             square,
+            Piece::new(PieceType::Queen, board.current_color),
             BISHOP_MASKS[square],
             BISHOP_MAGICS[square],
             &BISHOP_ATTACKS[square],
@@ -286,6 +296,7 @@ pub fn generate_captures(board: &Board) -> Moves {
             board,
             &mut moves,
             square,
+            Piece::new(PieceType::Knight, board.current_color),
             KNIGHT_ATTACKS[square]
                 & !board.bit_boards.col_occupancy(board.current_color)
                 & board.bit_boards.col_occupancy(!board.current_color),
@@ -355,6 +366,7 @@ pub fn generate_captures(board: &Board) -> Moves {
                 board,
                 &mut moves,
                 square as usize,
+                Piece::new(PieceType::King, board.current_color),
                 KING_ATTACKS[square as usize]
                     & !board.bit_boards.col_occupancy(board.current_color)
                     & board.bit_boards.col_occupancy(!board.current_color),
@@ -370,6 +382,7 @@ fn generate_sliding_moves(
     board: &Board,
     moves: &mut Moves,
     square: usize,
+    piece: Piece,
     mask: u64,
     magic: u64,
     attacks: &[u64; 4096],
@@ -378,6 +391,7 @@ fn generate_sliding_moves(
         board,
         moves,
         square,
+        piece,
         attacks[magic_key(magic, mask & board.bit_boards.occupancy(), mask.count_ones())]
             & !board.bit_boards.col_occupancy(board.current_color),
     );
@@ -388,6 +402,7 @@ fn generate_sliding_captures(
     board: &Board,
     moves: &mut Moves,
     square: usize,
+    piece: Piece,
     mask: u64,
     magic: u64,
     attacks: &[u64; 4096],
@@ -396,6 +411,7 @@ fn generate_sliding_captures(
         board,
         moves,
         square,
+        piece,
         attacks[magic_key(magic, mask & board.bit_boards.occupancy(), mask.count_ones())]
             & !board.bit_boards.col_occupancy(board.current_color)
             & board.bit_boards.col_occupancy(!board.current_color),
@@ -403,9 +419,13 @@ fn generate_sliding_captures(
 }
 
 #[inline]
-fn generate_piece_moves(board: &Board, moves: &mut Moves, square: usize, mut attacks: u64) {
-    let piece = board.piece_at(square);
-
+fn generate_piece_moves(
+    board: &Board,
+    moves: &mut Moves,
+    square: usize,
+    piece: Piece,
+    mut attacks: u64,
+) {
     while attacks != 0 {
         let attack = attacks.trailing_zeros();
 

@@ -252,7 +252,7 @@ impl Board {
         self.pieces[square]
     }
 
-    pub fn print_board(piece_at: impl Fn(usize) -> Piece) {
+    pub fn print_board(&self) {
         println!("  a b c d e f g h");
         println!("  ---------------");
 
@@ -260,7 +260,7 @@ impl Board {
             print!("{}|", rank + 1); // Print rank number
             for file in 0..8 {
                 let square = rank * 8 + file;
-                let piece = piece_at(square);
+                let piece = self.bit_boards.piece_at(square);
 
                 let piece_char = if piece == Piece::Empty { '.' } else { char::from(piece) };
 
@@ -345,6 +345,10 @@ impl Board {
 
     pub fn make_move(&mut self, r#move: Move, mut delta: impl MoveDeltaRecorder) {
         let (from, to, move_type, piece, capture) = r#move.unpack();
+
+        if move_type == MoveType::EnPassantCapture {
+            println!("en pass");
+        }
 
         if capture != PieceType::Empty {
             self.bit_boards.clear_piece(to, Piece::new(capture, !self.current_color));

@@ -215,9 +215,12 @@ impl Engine for GrandChessEngine {
         self.board = Board::from_fen(fen).unwrap();
 
         for uci_move in moves {
-            self.board.make_move(parse_move(&self.board, uci_move), NoDelta);
+            let parsed_move = parse_move(&self.board, uci_move);
+            println!("{}", to_uci_move(parsed_move));
+            self.board.make_move(parsed_move, NoDelta);
             self.ply_offset += 1;
         }
+        self.board.print_board();
     }
 
     fn new_game(&mut self) {
@@ -229,7 +232,10 @@ pub fn parse_move(board: &Board, uci_move: UciMove) -> Move {
     let from = ((uci_move.from.file as u8 - b'a') + (8 * (uci_move.from.rank - 1))) as usize;
     let to = ((uci_move.to.file as u8 - b'a') + (8 * (uci_move.to.rank - 1))) as usize;
 
-    if board.piece_at(from).get_type() == PieceType::Pawn && board.piece_at(to) == Piece::Empty {
+    if board.piece_at(from).get_type() == PieceType::Pawn
+        && board.piece_at(to) == Piece::Empty
+        && (uci_move.from.rank).abs_diff(uci_move.to.rank) == 2
+    {
         return Move::new(
             from as u32,
             to as u32,
@@ -292,11 +298,13 @@ pub fn parse_move(board: &Board, uci_move: UciMove) -> Move {
 
     // Check if the move is an en passant capture
     if board.piece_at(from).get_type() == PieceType::Pawn && board.piece_at(to) == Piece::Empty {
+        println!("diff is {}", (uci_move.to.file as u8).abs_diff(uci_move.from.file as u8));
         if board.current_color == PieceColor::Black
-            && uci_move.from.rank == 5
-            && uci_move.to.rank == 6
+            && uci_move.from.rank == 4
+            && uci_move.to.rank == 3
             && (uci_move.to.file as u8).abs_diff(uci_move.from.file as u8) == 1
         {
+            println!("got en passent");
             if board.piece_at(to + 8).get_type() == PieceType::Pawn {
                 return Move::new(
                     from as u32,
@@ -307,11 +315,11 @@ pub fn parse_move(board: &Board, uci_move: UciMove) -> Move {
                 );
             }
         } else if board.current_color == PieceColor::White
-            && uci_move.from.rank == 4
-            && uci_move.to.rank == 3
+            && uci_move.from.rank == 5
+            && uci_move.to.rank == 6
             && (uci_move.to.file as u8).abs_diff(uci_move.from.file as u8) == 1
-            && board.piece_at(to - 8).get_type() == PieceType::Pawn
         {
+            println!("got en passent");
             return Move::new(
                 from as u32,
                 to as u32,
@@ -344,5 +352,26 @@ pub fn parse_move(board: &Board, uci_move: UciMove) -> Move {
         )
     } else {
         Move::new(from as u32, to as u32, MoveType::QuietMove, board.piece_at(from), captured_piece)
+    }
+}
+
+pub fn to_uci_move(r#move: Move) -> UciMove {
+    let from =
+        UciSquare::from((((r#move.from() as u8) % 8) + b'a') as char, r#move.from() as u8 / 8 + 1);
+    let to = UciSquare::from((((r#move.to() as u8) % 8) + b'a') as char, r#move.to() as u8 / 8 + 1);
+    UciMove {
+        from,
+        to,
+        promotion: if r#move.move_type() == MoveType::Promote {
+            Some(match r#move.piece().get_type() {
+                PieceType::Queen => UciPiece::Queen,
+                PieceType::Rook => UciPiece::Rook,
+                PieceType::Bishop => UciPiece::Bishop,
+                PieceType::Knight => UciPiece::Knight,
+                _ => UciPiece::Queen,
+            })
+        } else {
+            None
+        },
     }
 }
