@@ -346,10 +346,6 @@ impl Board {
     pub fn make_move(&mut self, r#move: Move, mut delta: impl MoveDeltaRecorder) {
         let (from, to, move_type, piece, capture) = r#move.unpack();
 
-        if move_type == MoveType::EnPassantCapture {
-            println!("en pass");
-        }
-
         if capture != PieceType::Empty {
             self.bit_boards.clear_piece(to, Piece::new(capture, !self.current_color));
 

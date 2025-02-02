@@ -216,7 +216,6 @@ impl Engine for GrandChessEngine {
 
         for uci_move in moves {
             let parsed_move = parse_move(&self.board, uci_move);
-            println!("{}", to_uci_move(parsed_move));
             self.board.make_move(parsed_move, NoDelta);
             self.ply_offset += 1;
         }
@@ -298,7 +297,6 @@ pub fn parse_move(board: &Board, uci_move: UciMove) -> Move {
 
     // Check if the move is an en passant capture
     if board.piece_at(from).get_type() == PieceType::Pawn && board.piece_at(to) == Piece::Empty {
-        println!("diff is {}", (uci_move.to.file as u8).abs_diff(uci_move.from.file as u8));
         if board.current_color == PieceColor::Black
             && uci_move.from.rank == 4
             && uci_move.to.rank == 3
@@ -319,7 +317,6 @@ pub fn parse_move(board: &Board, uci_move: UciMove) -> Move {
             && uci_move.to.rank == 6
             && (uci_move.to.file as u8).abs_diff(uci_move.from.file as u8) == 1
         {
-            println!("got en passent");
             return Move::new(
                 from as u32,
                 to as u32,
