@@ -30,6 +30,7 @@ impl RefreshFlags {
 }
 
 pub trait FeatureSet {
+    #[type_const]
     const HALF_SIZE: usize;
 
     fn needs_refresh(r#move: Move) -> RefreshFlags;
@@ -45,13 +46,17 @@ pub trait FeatureSet {
     fn hash() -> u32;
 }
 
-pub trait Network<const IN: usize> {
+pub trait Network {
+    #[type_const]
+    const IN: usize;
+    #[type_const]
+    const HALF_IN: usize;
     type Buffer;
 
     fn load(&mut self, r: &mut impl Read);
     fn hash() -> u32;
 
-    fn eval(&self, input: &[i8; IN], buffer: &mut Self::Buffer) -> i32;
+    fn eval(&self, input: &[i8], buffer: &mut Self::Buffer) -> i32;
 }
 
 #[derive(Debug)]
@@ -90,24 +95,16 @@ impl<const N: usize> DerefMut for FeatureList<N> {
     }
 }
 
-pub struct Nnue<NET: Network<NET_IN>, SET: FeatureSet, const STACK_SIZE: usize, const NET_IN: usize>
-where
-    [(); SET::HALF_SIZE * 2]:,
-    [(); NET_IN / 2]:,
-{
+// Becuase we arent using const_generic_expr
+pub struct Nnue<NET: Network, SET: FeatureSet, const STACK_SIZE: usize> {
     net: NET,
     net_buffer: NET::Buffer,
-    transformer: FeatureTransformer<i16, i16, { SET::HALF_SIZE }, NET_IN>,
+    transformer: FeatureTransformer<i16, i16, { SET::HALF_SIZE }, { NET::HALF_IN }>,
 
-    acc_stack: [Accumulator<i16, NET_IN>; STACK_SIZE],
+    acc_stack: [Accumulator<i16, { NET::HALF_IN }>; STACK_SIZE],
 }
 
-impl<NET: Network<NET_IN>, SET: FeatureSet, const STACK_SIZE: usize, const NET_IN: usize>
-    Nnue<NET, SET, STACK_SIZE, NET_IN>
-where
-    [(); SET::HALF_SIZE * 2]:,
-    [(); NET_IN / 2]:,
-{
+impl<NET: Network, SET: FeatureSet, const STACK_SIZE: usize> Nnue<NET, SET, STACK_SIZE> {
     pub fn new_boxed(r: &mut impl Read) -> Box<Self> {
         let mut boxed = unsafe {
             Box::from_raw(std::alloc::alloc(std::alloc::Layout::new::<Self>()) as *mut Self)
@@ -118,7 +115,7 @@ where
 
     pub fn load(&mut self, r: &mut impl Read) {
         _ = r.read_i32::<LittleEndian>().unwrap();
-        let kp_hash: u32 = SET::hash() ^ NET_IN as u32;
+        let kp_hash: u32 = SET::hash() ^ NET::IN as u32;
         let correct_hash = kp_hash ^ NET::hash();
 
         let hash = r.read_u32::<LittleEndian>().unwrap();
@@ -226,7 +223,7 @@ where
     }
 
     pub fn eval(&mut self, ply: usize, side: PieceColor) -> i32 {
-        let mut input = [0; NET_IN];
+        let mut input = [0; NET::IN];
         self.transformer.transform(&self.acc_stack[ply], &mut input, side);
 
         self.net.eval(&input, &mut self.net_buffer)

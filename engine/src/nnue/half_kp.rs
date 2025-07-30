@@ -29,7 +29,7 @@ fn half_kp_index(king_sq: u32, piece_sq: u32, piece: Piece, prespective: PieceCo
 pub struct HalfKP {}
 
 impl FeatureSet for HalfKP {
-    //Num squares * (num_square * (num_pieces without king) + 1)
+    // Num squares * (num_square * (num_pieces without king) + 1)
     const HALF_SIZE: usize = 64 * (10 * 64 + 1);
     fn needs_refresh(r#move: Move) -> RefreshFlags {
         if r#move.piece().get_type() == PieceType::King {

@@ -7,27 +7,23 @@ use byteorder::{LittleEndian, ReadBytesExt};
 
 use super::Layer;
 
-pub struct LinearLayer<BT, const I: usize, const O: usize>
-where
-    [(); I * O]:,
-{
+pub struct LinearLayer<BT, const I: usize, const O: usize> {
     pub bias: [BT; O],
-    pub weights: [i8; I * O],
+    pub weights: [[i8; I]; O],
 }
 
-impl<const I: usize, const O: usize> Layer<i8, i32, I, O> for LinearLayer<i32, I, O>
-where
-    [(); I * O]:,
-{
+impl<const I: usize, const O: usize> Layer<i8, i32, I, O> for LinearLayer<i32, I, O> {
     fn load(&mut self, r: &mut impl Read) {
         for i in 0..O {
             self.bias[i] = r.read_i32::<LittleEndian>().unwrap();
         }
 
-        r.read_exact(unsafe {
-            slice::from_raw_parts_mut(self.weights.as_mut_ptr() as *mut u8, O * I)
-        })
-        .unwrap();
+        for i in 0..O {
+            r.read_exact(unsafe {
+                slice::from_raw_parts_mut(self.weights[i].as_mut_ptr() as *mut u8, I)
+            })
+            .unwrap();
+        }
     }
 
     fn get_hash(prev_hash: u32) -> u32 {
@@ -43,7 +39,7 @@ where
         if O == 1 {
             let mut sum = self.bias[0];
             for j in 0..I {
-                sum += input[j] as i32 * self.weights[j] as i32;
+                sum += input[j] as i32 * self.weights[0][j] as i32;
             }
 
             output[0] = sum;
@@ -70,7 +66,7 @@ where
                             &mut sum0,
                             input,
                             _mm256_loadu_si256(
-                                &self.weights[(i * 4 + 0) * I + j * REGISTER_WIDTH] as *const i8
+                                &self.weights[i * 4 + 0][j * REGISTER_WIDTH] as *const i8
                                     as *const _,
                             ),
                         );
@@ -79,7 +75,7 @@ where
                             &mut sum1,
                             input,
                             _mm256_loadu_si256(
-                                &self.weights[(i * 4 + 1) * I + j * REGISTER_WIDTH] as *const i8
+                                &self.weights[i * 4 + 1][j * REGISTER_WIDTH] as *const i8
                                     as *const _,
                             ),
                         );
@@ -87,7 +83,7 @@ where
                             &mut sum2,
                             input,
                             _mm256_loadu_si256(
-                                &self.weights[(i * 4 + 2) * I + j * REGISTER_WIDTH] as *const i8
+                                &self.weights[i * 4 + 2][j * REGISTER_WIDTH] as *const i8
                                     as *const _,
                             ),
                         );
@@ -95,7 +91,7 @@ where
                             &mut sum3,
                             input,
                             _mm256_loadu_si256(
-                                &self.weights[(i * 4 + 3) * I + j * REGISTER_WIDTH] as *const i8
+                                &self.weights[i * 4 + 3][j * REGISTER_WIDTH] as *const i8
                                     as *const _,
                             ),
                         );

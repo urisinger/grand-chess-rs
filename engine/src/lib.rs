@@ -1,4 +1,4 @@
-#![feature(generic_const_exprs, test)]
+#![feature(test, min_generic_const_args)]
 #![allow(incomplete_features, clippy::identity_op, clippy::needless_range_loop)]
 pub mod board;
 pub mod nnue;
@@ -49,7 +49,7 @@ pub struct GrandChessEngine {
 
     board: Board,
 
-    nnue: Box<Nnue<TripleLayerNetwork<512, 32, 32>, HalfKP, MAX_PLY, 512>>,
+    nnue: Box<Nnue<TripleLayerNetwork<512, 32, 32>, HalfKP, MAX_PLY>>,
 
     stop: bool,
 
