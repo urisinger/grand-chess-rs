@@ -1,4 +1,3 @@
-#![feature(test, min_generic_const_args)]
 #![allow(incomplete_features, clippy::identity_op, clippy::needless_range_loop)]
 pub mod board;
 pub mod nnue;
@@ -15,7 +14,7 @@ use board::{
     r#move::{Move, MoveType},
     Board,
 };
-use nnue::{half_kp::HalfKP, network::TripleLayerNetwork, Nnue};
+use nnue::{half_kp::HalfKP, Nnue};
 
 use self::transposition::{HashFlags, THash, TTable};
 
@@ -29,6 +28,8 @@ const MATE_SCORE: i32 = 48000;
 const MAX_PLY: usize = 128;
 
 const STOPPED: i32 = -1000000;
+
+Nnue!(HalfKP512_32_32, HalfKP, (512, 32, 32), MAX_PLY);
 
 pub struct GrandChessEngine {
     node_count: u64,
@@ -49,8 +50,7 @@ pub struct GrandChessEngine {
 
     board: Board,
 
-    nnue: Box<Nnue<TripleLayerNetwork<512, 32, 32>, HalfKP, MAX_PLY>>,
-
+    nnue: Box<HalfKP512_32_32>,
     stop: bool,
 
     dont_stop: bool,
@@ -69,7 +69,7 @@ impl GrandChessEngine {
             history_moves: [[0; 64]; 12],
             repetition_table: [0; MAX_PLY],
             board: Board::default(),
-            nnue: Nnue::new_boxed(&mut std::io::Cursor::new(NET)),
+            nnue: HalfKP512_32_32::new_boxed(&mut std::io::Cursor::new(NET)),
             stop: false,
             dont_stop: false,
         }

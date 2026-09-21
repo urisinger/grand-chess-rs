@@ -99,7 +99,7 @@ impl<const OUT: usize, const IN: usize> FeatureTransformer<i16, i16, IN, OUT> {
 
         const NUM_REGISTERS: usize = 16;
 
-        let num_chunks = OUT / (2 * NUM_REGISTERS * REGISTER_WIDTH);
+        let num_chunks = OUT / (NUM_REGISTERS * REGISTER_WIDTH);
 
         let zero = unsafe { _mm256_setzero_si256() };
         let mut regs = [zero; NUM_REGISTERS];
@@ -152,13 +152,13 @@ impl<const OUT: usize, const IN: usize> FeatureTransformer<i16, i16, IN, OUT> {
         let offset = if perspective == PieceColor::White { 0 } else { 1 };
 
         // Step 1: Copy bias into accumulator
-        for i in 0..FEATURES {
+        for i in 0..OUT {
             acc.accumulators[offset][i] = self.bias[i];
         }
 
         // Step 2: Accumulate weights for active features
         for &feature in features {
-            for i in 0..FEATURES {
+            for i in 0..OUT {
                 acc.accumulators[offset][i] += self.weights[feature][i];
             }
         }
@@ -172,7 +172,7 @@ impl<const OUT: usize, const IN: usize> FeatureTransformer<i16, i16, IN, OUT> {
         removed_features: &[usize],
         prespective: PieceColor,
     ) {
-        if cfg!(target_arch = "x86_64") {
+        if cfg!(target_feature = "avx2") {
             const REGISTER_WIDTH: usize = 256 / 16;
             let offset = if prespective == PieceColor::White { 0 } else { 1 };
 

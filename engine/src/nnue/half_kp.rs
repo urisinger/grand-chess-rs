@@ -4,7 +4,7 @@ use crate::board::{
     Board, PiecesDelta,
 };
 
-use super::{FeatureList, FeatureSet, RefreshFlags};
+use super::{FeatureList, RefreshFlags};
 
 fn half_kp_index(king_sq: u32, piece_sq: u32, piece: Piece, prespective: PieceColor) -> usize {
     let flipped_sq = piece_sq as usize ^ (0x3F * prespective as usize);
@@ -28,10 +28,10 @@ fn half_kp_index(king_sq: u32, piece_sq: u32, piece: Piece, prespective: PieceCo
 
 pub struct HalfKP {}
 
-impl FeatureSet for HalfKP {
+impl HalfKP {
     // Num squares * (num_square * (num_pieces without king) + 1)
-    const HALF_SIZE: usize = 64 * (10 * 64 + 1);
-    fn needs_refresh(r#move: Move) -> RefreshFlags {
+    pub const HALF_SIZE: usize = 64 * (10 * 64 + 1);
+    pub fn needs_refresh(r#move: Move) -> RefreshFlags {
         if r#move.piece().get_type() == PieceType::King {
             RefreshFlags::from_color(r#move.piece().get_color())
         } else {
@@ -39,7 +39,7 @@ impl FeatureSet for HalfKP {
         }
     }
 
-    fn active_features(features: &mut FeatureList<32>, board: &Board, prespective: PieceColor) {
+    pub fn active_features(features: &mut FeatureList<32>, board: &Board, prespective: PieceColor) {
         let king_sq = board.bit_boards[Piece::new(PieceType::King, prespective)].trailing_zeros();
         for i in 0..Piece::WhiteKing as usize {
             let mut pieces = board.bit_boards.pieces[i];
@@ -54,7 +54,7 @@ impl FeatureSet for HalfKP {
         }
     }
 
-    fn features_diff<const N: usize>(
+    pub fn features_diff<const N: usize>(
         delta: &PiecesDelta,
         added_features: &mut FeatureList<N>,
         removed_features: &mut FeatureList<N>,
@@ -75,7 +75,7 @@ impl FeatureSet for HalfKP {
         }
     }
 
-    fn hash() -> u32 {
+    pub fn hash() -> u32 {
         0x5D69D5B9 ^ 1
     }
 }

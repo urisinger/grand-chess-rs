@@ -1,18 +1,16 @@
-use std::{
-    io::Read,
-    ops::{Deref, DerefMut},
-};
+use std::ops::{Deref, DerefMut};
 
-use crate::board::{piece::PieceColor, r#move::Move, Board, PiecesDelta};
-use byteorder::{LittleEndian, ReadBytesExt};
-
-use self::feature_transformer::{Accumulator, FeatureTransformer};
+use crate::board::piece::PieceColor;
 
 mod feature_transformer;
 pub mod half_kp;
 
-mod layers;
-pub mod network;
+mod layer;
+mod network;
+
+pub(crate) use feature_transformer::{Accumulator, FeatureTransformer};
+pub(crate) use layer::LinearLayer;
+pub(crate) use network::{net, Network};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RefreshFlags {
@@ -27,36 +25,6 @@ impl RefreshFlags {
             PieceColor::Black => RefreshFlags { black: true, white: false },
         }
     }
-}
-
-pub trait FeatureSet {
-    #[type_const]
-    const HALF_SIZE: usize;
-
-    fn needs_refresh(r#move: Move) -> RefreshFlags;
-    fn active_features(features: &mut FeatureList<32>, board: &Board, prespective: PieceColor);
-    fn features_diff<const N: usize>(
-        delta: &PiecesDelta,
-        added_features: &mut FeatureList<N>,
-        removed_features: &mut FeatureList<N>,
-        board: &Board,
-        prespective: PieceColor,
-    );
-
-    fn hash() -> u32;
-}
-
-pub trait Network {
-    #[type_const]
-    const IN: usize;
-    #[type_const]
-    const HALF_IN: usize;
-    type Buffer;
-
-    fn load(&mut self, r: &mut impl Read);
-    fn hash() -> u32;
-
-    fn eval(&self, input: &[i8], buffer: &mut Self::Buffer) -> i32;
 }
 
 #[derive(Debug)]
@@ -95,137 +63,317 @@ impl<const N: usize> DerefMut for FeatureList<N> {
     }
 }
 
-// Becuase we arent using const_generic_expr
-pub struct Nnue<NET: Network, SET: FeatureSet, const STACK_SIZE: usize> {
-    net: NET,
-    net_buffer: NET::Buffer,
-    transformer: FeatureTransformer<i16, i16, { SET::HALF_SIZE }, { NET::HALF_IN }>,
+macro_rules! Nnue {
+    (
+        $name:ident,
+        $set:ty,
+        ($input:expr, $($size:expr),+ $(,)?),
+        $stack_size:expr $(,)?
+    ) => {
+        pub struct $name {
+            net: $crate::nnue::net!(
+                $input,
+                $($size),+
+            ),
 
-    acc_stack: [Accumulator<i16, { NET::HALF_IN }>; STACK_SIZE],
+            net_buffer: <
+                $crate::nnue::net!(
+                    $input,
+                    $($size),+
+                ) as $crate::nnue::Network
+            >::Buffer,
+
+            transformer: $crate::nnue::FeatureTransformer<
+                i16,
+                i16,
+                { <$set>::HALF_SIZE },
+                { $input / 2 },
+            >,
+
+            acc_stack: [
+                $crate::nnue::Accumulator<
+                    i16,
+                    { $input / 2 }
+                >;
+                $stack_size
+            ],
+        }
+
+        impl $name {
+            pub fn new_boxed(
+                r: &mut impl std::io::Read,
+            ) -> Box<Self> {
+                let mut boxed = unsafe {
+                    Box::from_raw(
+                        std::alloc::alloc(
+                            std::alloc::Layout::new::<Self>()
+                        ) as *mut Self
+                    )
+                };
+
+                boxed.load(r);
+                boxed
+            }
+
+            pub fn load(
+                &mut self,
+                r: &mut impl std::io::Read,
+            ) {
+                use byteorder::ReadBytesExt;
+
+                _ = r
+                    .read_i32::<byteorder::LittleEndian>()
+                    .unwrap();
+
+                let kp_hash =
+                    <$set>::hash()
+                        ^ ($input as u32);
+
+                let net_hash = <
+                    $crate::nnue::net!(
+                        $input,
+                        $($size),+
+                    ) as $crate::nnue::Network
+                >::hash(0xEC42E90Du32 ^ ($input as u32));
+
+                let correct_hash =
+                    kp_hash ^ net_hash;
+
+                let hash = r
+                    .read_u32::<byteorder::LittleEndian>()
+                    .unwrap();
+
+                if hash != correct_hash {
+                    eprintln!(
+                        "Incorrect hash!: expected {}, found {}",
+                        correct_hash,
+                        hash
+                    );
+                }
+
+                let size = r
+                    .read_i32::<byteorder::LittleEndian>()
+                    .unwrap() as usize;
+
+                let mut buf = vec![0u8; size];
+
+                std::io::Read::read_exact(
+                    r,
+                    &mut buf,
+                )
+                .unwrap();
+
+                let hash = r
+                    .read_u32::<byteorder::LittleEndian>()
+                    .unwrap();
+
+                assert_eq!(
+                    hash,
+                    kp_hash,
+                    "Incorrect feature hash! expected {}, found {}",
+                    kp_hash,
+                    hash
+                );
+
+                self.transformer.load(r);
+
+                let hash = r
+                    .read_u32::<byteorder::LittleEndian>()
+                    .unwrap();
+
+                assert_eq!(
+                    hash,
+                    net_hash,
+                    "Incorrect network hash! expected {}, found {}",
+                    net_hash,
+                    hash
+                );
+                <$crate::nnue::net!($input, $($size),+)
+                    as $crate::nnue::Network>::load(
+                        &mut self.net,
+                        r,
+                    );
+            }
+
+            pub fn refresh_board(
+                &mut self,
+                board: &$crate::board::Board,
+                ply: usize,
+            ) {
+                let mut features =
+                    $crate::nnue::FeatureList::new();
+
+                <$set>::active_features(
+                    &mut features,
+                    board,
+                    $crate::board::piece::PieceColor::White,
+                );
+
+                self.transformer.refresh(
+                    &mut self.acc_stack[ply],
+                    &features,
+                    $crate::board::piece::PieceColor::White,
+                );
+
+                let mut features =
+                    $crate::nnue::FeatureList::new();
+
+                <$set>::active_features(
+                    &mut features,
+                    board,
+                    $crate::board::piece::PieceColor::Black,
+                );
+
+                self.transformer.refresh(
+                    &mut self.acc_stack[ply],
+                    &features,
+                    $crate::board::piece::PieceColor::Black,
+                );
+            }
+
+            pub fn make_null_move(
+                &mut self,
+                board: &mut $crate::board::Board,
+                ply: usize,
+            ) {
+                board.make_null_move();
+
+                let split =
+                    self.acc_stack.split_at_mut(ply + 1);
+
+                split.1[0]
+                    .accumulators
+                    .copy_from_slice(
+                        &split.0[ply].accumulators
+                    );
+            }
+
+            pub fn make_move(
+                &mut self,
+                r#move: $crate::board::r#move::Move,
+                board: &mut $crate::board::Board,
+                ply: usize,
+            ) {
+                let mut delta =
+                    $crate::board::PiecesDelta::new();
+
+                board.make_move(
+                    r#move,
+                    &mut delta,
+                );
+
+                let needs_refresh =
+                    <$set>::needs_refresh(
+                        r#move
+                    );
+
+                if needs_refresh.white {
+                    let mut features =
+                        $crate::nnue::FeatureList::new();
+
+                    <$set>::active_features(
+                        &mut features,
+                        board,
+                        $crate::board::piece::PieceColor::White,
+                    );
+
+                    self.transformer.refresh(
+                        &mut self.acc_stack[ply + 1],
+                        &features,
+                        $crate::board::piece::PieceColor::White,
+                    );
+                } else {
+                    let mut removed_features =
+                        $crate::nnue::FeatureList::<4>::new();
+
+                    let mut added_features =
+                        $crate::nnue::FeatureList::<4>::new();
+
+                    <$set>::features_diff(
+                        &delta,
+                        &mut added_features,
+                        &mut removed_features,
+                        board,
+                        $crate::board::piece::PieceColor::White,
+                    );
+
+                    let split =
+                        self.acc_stack.split_at_mut(ply + 1);
+
+                    self.transformer.update_incremental(
+                        &mut split.1[0],
+                        &split.0[ply],
+                        &added_features,
+                        &removed_features,
+                        $crate::board::piece::PieceColor::White,
+                    );
+                }
+
+                if needs_refresh.black {
+                    let mut features =
+                        $crate::nnue::FeatureList::new();
+
+                    <$set>::active_features(
+                        &mut features,
+                        board,
+                        $crate::board::piece::PieceColor::Black,
+                    );
+
+                    self.transformer.refresh(
+                        &mut self.acc_stack[ply + 1],
+                        &features,
+                        $crate::board::piece::PieceColor::Black,
+                    );
+                } else {
+                    let mut removed_features =
+                        $crate::nnue::FeatureList::<4>::new();
+
+                    let mut added_features =
+                        $crate::nnue::FeatureList::<4>::new();
+
+                    <$set>::features_diff(
+                        &delta,
+                        &mut added_features,
+                        &mut removed_features,
+                        board,
+                        $crate::board::piece::PieceColor::Black,
+                    );
+
+                    let split =
+                        self.acc_stack.split_at_mut(ply + 1);
+
+                    self.transformer.update_incremental(
+                        &mut split.1[0],
+                        &split.0[ply],
+                        &added_features,
+                        &removed_features,
+                        $crate::board::piece::PieceColor::Black,
+                    );
+                }
+            }
+
+            pub fn eval(
+                &mut self,
+                ply: usize,
+                side: $crate::board::piece::PieceColor,
+            ) -> i32 {
+                let mut input =
+                    [0i8; $input];
+
+                self.transformer.transform(
+                    &self.acc_stack[ply],
+                    &mut input,
+                    side,
+                );
+                <$crate::nnue::net!($input, $($size),+)
+                    as $crate::nnue::Network>::eval(
+                        &self.net,
+                        &input,
+                        &mut self.net_buffer,
+                    )
+            }
+        }
+    };
 }
 
-impl<NET: Network, SET: FeatureSet, const STACK_SIZE: usize> Nnue<NET, SET, STACK_SIZE> {
-    pub fn new_boxed(r: &mut impl Read) -> Box<Self> {
-        let mut boxed = unsafe {
-            Box::from_raw(std::alloc::alloc(std::alloc::Layout::new::<Self>()) as *mut Self)
-        };
-        boxed.load(r);
-        boxed
-    }
-
-    pub fn load(&mut self, r: &mut impl Read) {
-        _ = r.read_i32::<LittleEndian>().unwrap();
-        let kp_hash: u32 = SET::hash() ^ NET::IN as u32;
-        let correct_hash = kp_hash ^ NET::hash();
-
-        let hash = r.read_u32::<LittleEndian>().unwrap();
-
-        if hash != correct_hash {
-            eprintln!("Incorrect hash!: expected {}, found {}", correct_hash, hash);
-        }
-
-        let size = r.read_i32::<LittleEndian>().unwrap() as usize;
-
-        let mut buf = vec![0u8; size];
-        r.read_exact(&mut buf).unwrap();
-
-        let hash = r.read_u32::<LittleEndian>().unwrap();
-
-        assert_eq!(hash, kp_hash, "Incorrect feature hash! expected {}, found {}", hash, kp_hash);
-
-        self.transformer.load(r);
-        let correct_hash = NET::hash();
-        let hash = r.read_u32::<LittleEndian>().unwrap();
-
-        assert_eq!(
-            hash, correct_hash,
-            "Incorrect network hash! expected {}, found {}",
-            hash, correct_hash
-        );
-
-        self.net.load(r);
-    }
-
-    pub fn refresh_board(&mut self, board: &Board, ply: usize) {
-        let mut features = FeatureList::new();
-        SET::active_features(&mut features, board, PieceColor::White);
-        self.transformer.refresh(&mut self.acc_stack[ply], &features, PieceColor::White);
-
-        let mut features = FeatureList::new();
-        SET::active_features(&mut features, board, PieceColor::Black);
-        self.transformer.refresh(&mut self.acc_stack[ply], &features, PieceColor::Black);
-    }
-
-    pub fn make_null_move(&mut self, board: &mut Board, ply: usize) {
-        board.make_null_move();
-
-        let split = self.acc_stack.split_at_mut(ply + 1);
-        split.1[0].accumulators.copy_from_slice(&split.0[ply].accumulators);
-    }
-
-    pub fn make_move(&mut self, r#move: Move, board: &mut Board, ply: usize) {
-        let mut delta = PiecesDelta::new();
-        board.make_move(r#move, &mut delta);
-
-        let needs_refresh = SET::needs_refresh(r#move);
-
-        if needs_refresh.white {
-            let mut features = FeatureList::new();
-            SET::active_features(&mut features, board, PieceColor::White);
-            self.transformer.refresh(&mut self.acc_stack[ply + 1], &features, PieceColor::White);
-        } else {
-            let mut removed_features = FeatureList::<4>::new();
-            let mut added_features = FeatureList::<4>::new();
-            SET::features_diff(
-                &delta,
-                &mut added_features,
-                &mut removed_features,
-                board,
-                PieceColor::White,
-            );
-
-            let split = self.acc_stack.split_at_mut(ply + 1);
-            self.transformer.update_incremental(
-                &mut split.1[0],
-                &split.0[ply],
-                &added_features,
-                &removed_features,
-                PieceColor::White,
-            );
-        }
-
-        if needs_refresh.black {
-            let mut features = FeatureList::new();
-            SET::active_features(&mut features, board, PieceColor::Black);
-
-            self.transformer.refresh(&mut self.acc_stack[ply + 1], &features, PieceColor::Black);
-        } else {
-            let mut removed_features = FeatureList::<4>::new();
-            let mut added_features = FeatureList::<4>::new();
-
-            SET::features_diff(
-                &delta,
-                &mut added_features,
-                &mut removed_features,
-                board,
-                PieceColor::Black,
-            );
-
-            let split = self.acc_stack.split_at_mut(ply + 1);
-            self.transformer.update_incremental(
-                &mut split.1[0],
-                &split.0[ply],
-                &added_features,
-                &removed_features,
-                PieceColor::Black,
-            );
-        }
-    }
-
-    pub fn eval(&mut self, ply: usize, side: PieceColor) -> i32 {
-        let mut input = [0; NET::IN];
-        self.transformer.transform(&self.acc_stack[ply], &mut input, side);
-
-        self.net.eval(&input, &mut self.net_buffer)
-    }
-}
+pub(crate) use Nnue;

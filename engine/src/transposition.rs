@@ -138,6 +138,8 @@ impl TTable {
 
 #[cfg(test)]
 mod tests {
+    use std::mem::transmute;
+
     use rand::Rng;
 
     use crate::board::{movegen::generate_moves, PiecesDelta};
